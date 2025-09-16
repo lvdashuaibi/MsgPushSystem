@@ -1,0 +1,87 @@
+version: '3.8'
+
+services:
+  # MySQL 服务
+  mysql:
+    image: mysql:8.0
+    container_name: msgcenter_mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpass   # 设置root密码
+      MYSQL_DATABASE: msgcenter_db          # 初始化数据库
+      TZ: Asia/Shanghai               # 时区配置
+    ports:
+      - "3306:3306"                   # 宿主机端口:容器端口
+    volumes:
+      - ./docker-compose/mysql/data:/var/lib/mysql   # 数据持久化
+    networks:
+      - backend-network               # 自定义网络
+
+  # Redis 服务
+  redis:
+    image: redis:6.2.14
+    container_name: msgcenter_redis
+    command: redis-server --requirepass redispass  # 设置访问密码
+    ports:
+      - "6379:6379"
+    volumes:
+      - ./docker-compose/redis/data:/data
+    networks:
+      - backend-network
+
+  # Zookeeper（Kafka 依赖）
+  zookeeper:
+    image: confluentinc/cp-zookeeper:latest
+    container_name: msgcenter_zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+    ports:
+      - "2181:2181"
+    volumes:
+      - ./docker-compose/zookeeper/data:/data
+    networks:
+      - backend-network
+
+  # Kafka 服务
+  kafka:
+    image: confluentinc/cp-kafka:7.4.0
+    container_name: msgcenter_kafka
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+    ports:
+      - "9092:9092"
+      - "9093:9093"
+    volumes:
+      - ./docker-compose/kafka/data:/var/lib/kafka/data
+    networks:
+      - backend-network
+
+  # Kafka UI 服务
+  kafka-ui:
+    container_name: kafka-ui
+    image: provectuslabs/kafka-ui:latest
+    ports:
+      - 8899:8080
+    depends_on:
+      - kafka
+    environment:
+      DYNAMIC_CONFIG_ENABLED: 'true'
+      KAFKA_CLUSTERS_0_NAME: msgcenter_kafka
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: msgcenter_kafka:9093
+    networks:
+      - backend-network
+      
+# 自定义网络（服务间通过容器名直接通信）
+networks:
+  backend-network:
+    driver: bridge

@@ -1,0 +1,981 @@
+openapi: 3.1.0
+info:
+  title: MsgMate 消息推送系统API
+  description: |
+    MsgMate 消息推送系统API，提供以下功能：
+    - 📧 消息发送和模板管理
+    - 👥 用户管理和联系方式管理
+    - 🏷️ 用户标签管理和批量发送
+    - ⏰ 定时消息发送和调度
+    - 📊 消息记录和统计分析
+  version: 2.0.0
+servers:
+  - url: http://localhost:8109
+    description: 本地开发服务器
+paths:
+  /msg/send_msg:
+    post:
+      summary: 发送消息
+      description: 使用指定模板发送消息
+      operationId: sendMsg
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SendMsgReq'
+      responses:
+        '200':
+          description: 成功发送消息
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SendMsgResp'
+  /msg/get_msg_record:
+    get:
+      summary: 获取消息记录
+      description: 通过消息ID获取消息记录
+      operationId: getMsgRecord
+      parameters:
+        - name: msgID
+          in: query
+          description: 消息ID
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 成功获取消息记录
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetMsgRecordResp'
+  /msg/create_template:
+    post:
+      summary: 创建消息模板
+      description: 创建一个新的消息模板
+      operationId: createTemplate
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTemplateReq'
+      responses:
+        '200':
+          description: 成功创建模板
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateTemplateResp'
+  /msg/get_template:
+    get:
+      summary: 获取模板信息
+      description: 通过模板ID获取模板详细信息
+      operationId: getTemplate
+      parameters:
+        - name: templateID
+          in: query
+          description: 模板ID
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 成功获取模板信息
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetTemplateResp'
+  /msg/update_template:
+    post:
+      summary: 更新模板
+      description: 更新指定模板的信息
+      operationId: updateTemplate
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateTemplateReq'
+      responses:
+        '200':
+          description: 成功更新模板
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpdateTemplateResp'
+  /msg/del_template:
+    post:
+      summary: 删除模板
+      description: 删除指定的模板
+      operationId: delTemplate
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DelTemplateReq'
+      responses:
+        '200':
+          description: 成功删除模板
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DelTemplateResp'
+
+  # 用户管理API
+  /user/create:
+    post:
+      summary: 创建用户
+      description: 创建一个新用户，支持多种联系方式和标签
+      operationId: createUser
+      tags:
+        - 用户管理
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateUserReq'
+      responses:
+        '200':
+          description: 成功创建用户
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateUserResp'
+
+  /user/get:
+    get:
+      summary: 获取用户信息
+      description: 通过用户ID获取用户详细信息
+      operationId: getUser
+      tags:
+        - 用户管理
+      parameters:
+        - name: user_id
+          in: query
+          description: 用户唯一标识
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 成功获取用户信息
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetUserResp'
+
+  /user/update:
+    post:
+      summary: 更新用户信息
+      description: 更新用户的基本信息、联系方式或标签
+      operationId: updateUser
+      tags:
+        - 用户管理
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateUserReq'
+      responses:
+        '200':
+          description: 成功更新用户信息
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpdateUserResp'
+
+  /user/list:
+    get:
+      summary: 获取用户列表
+      description: 分页获取用户列表
+      operationId: listUsers
+      tags:
+        - 用户管理
+      parameters:
+        - name: page
+          in: query
+          description: 页码，从1开始
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: page_size
+          in: query
+          description: 每页数量
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 10
+      responses:
+        '200':
+          description: 成功获取用户列表
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListUsersResp'
+
+  /user/delete:
+    post:
+      summary: 删除用户
+      description: 删除指定用户（软删除）
+      operationId: deleteUser
+      tags:
+        - 用户管理
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeleteUserReq'
+      responses:
+        '200':
+          description: 成功删除用户
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeleteUserResp'
+
+  /user/find_by_tags:
+    post:
+      summary: 按标签查找用户
+      description: 根据标签查找用户，支持精确匹配和模糊匹配
+      operationId: findUsersByTags
+      tags:
+        - 用户管理
+        - 标签管理
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FindUsersByTagsReq'
+      responses:
+        '200':
+          description: 成功查找用户
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FindUsersByTagsResp'
+
+  /user/tag_statistics:
+    get:
+      summary: 获取标签统计
+      description: 获取所有标签的使用统计信息
+      operationId: getTagStatistics
+      tags:
+        - 标签管理
+      responses:
+        '200':
+          description: 成功获取标签统计
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetTagStatisticsResp'
+
+  # 定时消息API
+  /scheduled/create:
+    post:
+      summary: 创建定时消息
+      description: 创建一个定时发送的消息任务
+      operationId: createScheduledMessage
+      tags:
+        - 定时消息
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateScheduledMessageReq'
+      responses:
+        '200':
+          description: 成功创建定时消息
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateScheduledMessageResp'
+
+  /scheduled/get:
+    get:
+      summary: 获取定时消息
+      description: 通过调度ID获取定时消息详情
+      operationId: getScheduledMessage
+      tags:
+        - 定时消息
+      parameters:
+        - name: schedule_id
+          in: query
+          description: 定时消息调度ID
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 成功获取定时消息
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetScheduledMessageResp'
+
+  /scheduled/list:
+    get:
+      summary: 获取定时消息列表
+      description: 分页获取定时消息列表
+      operationId: listScheduledMessages
+      tags:
+        - 定时消息
+      parameters:
+        - name: page
+          in: query
+          description: 页码，从1开始
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: page_size
+          in: query
+          description: 每页数量
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 10
+        - name: status
+          in: query
+          description: 消息状态过滤
+          required: false
+          schema:
+            type: integer
+            enum: [1, 2, 3, 4]
+            description: 1-待发送，2-已发送，3-已取消，4-发送失败
+      responses:
+        '200':
+          description: 成功获取定时消息列表
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListScheduledMessagesResp'
+
+  /scheduled/cancel:
+    post:
+      summary: 取消定时消息
+      description: 取消指定的定时消息
+      operationId: cancelScheduledMessage
+      tags:
+        - 定时消息
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CancelScheduledMessageReq'
+      responses:
+        '200':
+          description: 成功取消定时消息
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CancelScheduledMessageResp'
+
+components:
+  schemas:
+    RespComm:
+      type: object
+      description: 通用响应结构
+      properties:
+        code:
+          type: integer
+          description: 响应状态码，0表示成功
+        msg:
+          type: string
+          description: 响应消息
+    SendMsgReq:
+      type: object
+      description: 发送消息请求
+      required:
+        - to
+        - templateID
+        - templateData
+      properties:
+        to:
+          type: string
+          description: 接收者
+        subject:
+          type: string
+          description: 消息主题
+        priority:
+          type: integer
+          description: 消息优先级
+        templateID:
+          type: string
+          description: 模板ID
+        templateData:
+          type: object
+          additionalProperties:
+            type: string
+          description: 模板数据，用于填充模板内容
+        sendTimestamp:
+          type: integer
+          format: int64
+          description: 发送时间戳
+    SendMsgResp:
+      type: object
+      description: 发送消息响应
+      allOf:
+        - $ref: '#/components/schemas/RespComm'
+        - type: object
+          properties:
+            msgID:
+              type: string
+              description: 消息ID
+    GetMsgRecordReq:
+      type: object
+      description: 获取消息记录请求
+      required:
+        - msgID
+      properties:
+        msgID:
+          type: string
+          description: 消息ID
+    GetMsgRecordResp:
+      type: object
+      description: 获取消息记录响应
+      allOf:
+        - $ref: '#/components/schemas/RespComm'
+        - type: object
+          properties:
+            to:
+              type: string
+              description: 接收者
+            subject:
+              type: string
+              description: 消息主题
+            templateID:
+              type: string
+              description: 模板ID
+            templateData:
+              type: object
+              additionalProperties:
+                type: string
+              description: 模板数据
+    CreateTemplateReq:
+      type: object
+      description: 创建模板请求
+      required:
+        - sourceID
+        - name
+        - channel
+        - content
+      properties:
+        sourceID:
+          type: string
+          description: 源ID
+        name:
+          type: string
+          description: 模板名称
+        subject:
+          type: string
+          description: 主题
+        signName:
+          type: string
+          description: 签名名称
+        channel:
+          type: integer
+          description: 渠道
+        content:
+          type: string
+          description: 模板内容
+    CreateTemplateResp:
+      type: object
+      description: 创建模板响应
+      allOf:
+        - $ref: '#/components/schemas/RespComm'
+        - type: object
+          properties:
+            templateID:
+              type: string
+              description: 模板ID
+    GetTemplateReq:
+      type: object
+      description: 获取模板请求
+      required:
+        - templateID
+      properties:
+        templateID:
+          type: string
+          description: 模板ID
+    GetTemplateResp:
+      type: object
+      description: 获取模板响应
+      allOf:
+        - $ref: '#/components/schemas/RespComm'
+        - type: object
+          properties:
+            relTemplateID:
+              type: string
+              description: 关联模板ID
+            sourceID:
+              type: string
+              description: 源ID
+            signName:
+              type: string
+              description: 签名名称
+            name:
+              type: string
+              description: 模板名称
+            subject:
+              type: string
+              description: 主题
+            channel:
+              type: integer
+              description: 渠道
+            content:
+              type: string
+              description: 模板内容
+    UpdateTemplateReq:
+      type: object
+      description: 更新模板请求
+      required:
+        - templateID
+      properties:
+        templateID:
+          type: string
+          description: 模板ID
+        name:
+          type: string
+          description: 模板名称
+        sourceID:
+          type: string
+          description: 源ID
+        subject:
+          type: string
+          description: 主题
+        channel:
+          type: integer
+          description: 渠道
+        content:
+          type: string
+          description: 模板内容
+    UpdateTemplateResp:
+      type: object
+      description: 更新模板响应
+      allOf:
+        - $ref: '#/components/schemas/RespComm'
+    DelTemplateReq:
+      type: object
+      description: 删除模板请求
+      required:
+        - templateID
+      properties:
+        templateID:
+          type: string
+          description: 模板ID
+    DelTemplateResp:
+      type: object
+      description: 删除模板响应
+      allOf:
+        - $ref: '#/components/schemas/RespComm'
+    # 用户管理相关Schema
+    User:
+      type: object
+      description: 用户信息
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: 数据库自增ID
+        user_id:
+          type: string
+          description: 用户唯一标识
+        name:
+          type: string
+          description: 用户姓名
+        nickname:
+          type: string
+          description: 用户昵称
+        mobile:
+          type: string
+          description: 手机号
+        email:
+          type: string
+          description: 邮箱地址
+        lark_id:
+          type: string
+          description: 飞书用户ID
+        tags:
+          type: array
+          items:
+            type: string
+          description: 用户标签列表
+        status:
+          type: integer
+          description: 用户状态，1-启用，0-禁用
+        create_time:
+          type: string
+          format: date-time
+          description: 创建时间
+        modify_time:
+          type: string
+          format: date-time
+          description: 修改时间
+
+    CreateUserReq:
+      type: object
+      description: 创建用户请求
+      required:
+        - user_id
+        - name
+      properties:
+        user_id:
+          type: string
+          description: 用户唯一标识
+          example: "user_001"
+        name:
+          type: string
+          description: 用户姓名
+          example: "张三"
+        nickname:
+          type: string
+          description: 用户昵称
+          example: "小张"
+        mobile:
+          type: string
+          description: 手机号
+          example: "13800138000"
+        email:
+          type: string
+          format: email
+          description: 邮箱地址
+          example: "zhangsan@example.com"
+        lark_id:
+          type: string
+          description: 飞书用户ID
+          example: "lark_user_001"
+        tags:
+          type: array
+          items:
+            type: string
+          description: 用户标签列表
+          example: ["朋友", "同事"]
+
+    CreateUserResp:
+      type: object
+      description: 创建用户响应
+      allOf:
+        - $ref: '#/components/schemas/RespComm'
+        - type: object
+          properties:
+            user_id:
+              type: string
+              description: 创建的用户ID
+
+    GetUserResp:
+      type: object
+      description: 获取用户信息响应
+      allOf:
+        - $ref: '#/components/schemas/RespComm'
+        - type: object
+          properties:
+            user:
+              $ref: '#/components/schemas/User'
+
+    UpdateUserReq:
+      type: object
+      description: 更新用户信息请求
+      required:
+        - user_id
+      properties:
+        user_id:
+          type: string
+          description: 用户唯一标识
+        name:
+          type: string
+          description: 用户姓名
+        nickname:
+          type: string
+          description: 用户昵称
+        mobile:
+          type: string
+          description: 手机号
+        email:
+          type: string
+          format: email
+          description: 邮箱地址
+        lark_id:
+          type: string
+          description: 飞书用户ID
+        tags:
+          type: array
+          items:
+            type: string
+          description: 用户标签列表
+        status:
+          type: integer
+          description: 用户状态，1-启用，0-禁用
+
+    UpdateUserResp:
+      type: object
+      description: 更新用户信息响应
+      allOf:
+        - $ref: '#/components/schemas/RespComm'
+
+    ListUsersResp:
+      type: object
+      description: 用户列表响应
+      allOf:
+        - $ref: '#/components/schemas/RespComm'
+        - type: object
+          properties:
+            users:
+              type: array
+              items:
+                $ref: '#/components/schemas/User'
+              description: 用户列表
+            total:
+              type: integer
+              format: int64
+              description: 总数量
+            page:
+              type: integer
+              description: 当前页码
+
+    DeleteUserReq:
+      type: object
+      description: 删除用户请求
+      required:
+        - user_id
+      properties:
+        user_id:
+          type: string
+          description: 用户唯一标识
+
+    DeleteUserResp:
+      type: object
+      description: 删除用户响应
+      allOf:
+        - $ref: '#/components/schemas/RespComm'
+
+    FindUsersByTagsReq:
+      type: object
+      description: 按标签查找用户请求
+      required:
+        - tags
+      properties:
+        tags:
+          type: array
+          items:
+            type: string
+          description: 标签列表
+          example: ["朋友", "同事"]
+        match_type:
+          type: string
+          enum: ["any", "all"]
+          default: "any"
+          description: 匹配类型，any-任意匹配，all-全部匹配
+        page:
+          type: integer
+          minimum: 1
+          default: 1
+          description: 页码
+        page_size:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 10
+          description: 每页数量
+
+    FindUsersByTagsResp:
+      type: object
+      description: 按标签查找用户响应
+      allOf:
+        - $ref: '#/components/schemas/RespComm'
+        - type: object
+          properties:
+            users:
+              type: array
+              items:
+                $ref: '#/components/schemas/User'
+              description: 匹配的用户列表
+            total:
+              type: integer
+              format: int64
+              description: 总数量
+            page:
+              type: integer
+              description: 当前页码
+
+    TagStatistic:
+      type: object
+      description: 标签统计信息
+      properties:
+        tag:
+          type: string
+          description: 标签名称
+        count:
+          type: integer
+          format: int64
+          description: 使用该标签的用户数量
+
+    GetTagStatisticsResp:
+      type: object
+      description: 标签统计响应
+      allOf:
+        - $ref: '#/components/schemas/RespComm'
+        - type: object
+          properties:
+            statistics:
+              type: array
+              items:
+                $ref: '#/components/schemas/TagStatistic'
+              description: 标签统计列表
+
+    # 定时消息相关Schema
+    ScheduledMessage:
+      type: object
+      description: 定时消息信息
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: 数据库自增ID
+        schedule_id:
+          type: string
+          description: 定时消息唯一标识
+        user_ids:
+          type: array
+          items:
+            type: string
+          description: 目标用户ID列表
+        tags:
+          type: array
+          items:
+            type: string
+          description: 目标标签列表
+        template_id:
+          type: string
+          description: 消息模板ID
+        template_data:
+          type: string
+          description: 模板数据（JSON格式）
+        scheduled_time:
+          type: string
+          format: date-time
+          description: 计划发送时间
+        status:
+          type: integer
+          description: 状态，1-待发送，2-已发送，3-已取消，4-发送失败
+        actual_send_time:
+          type: string
+          format: date-time
+          description: 实际发送时间
+        create_time:
+          type: string
+          format: date-time
+          description: 创建时间
+        modify_time:
+          type: string
+          format: date-time
+          description: 修改时间
+
+    CreateScheduledMessageReq:
+      type: object
+      description: 创建定时消息请求
+      required:
+        - template_id
+        - scheduled_time
+      properties:
+        user_ids:
+          type: array
+          items:
+            type: string
+          description: 目标用户ID列表
+          example: ["user_001", "user_002"]
+        tags:
+          type: array
+          items:
+            type: string
+          description: 目标标签列表
+          example: ["朋友", "同事"]
+        template_id:
+          type: string
+          description: 消息模板ID
+          example: "template_001"
+        template_data:
+          type: object
+          additionalProperties:
+            type: string
+          description: 模板数据，用于填充模板内容
+          example:
+            name: "张三"
+            code: "123456"
+        scheduled_time:
+          type: string
+          format: date-time
+          description: 计划发送时间，格式：YYYY-MM-DD HH:mm:ss
+          example: "2025-09-12 15:30:00"
+
+    CreateScheduledMessageResp:
+      type: object
+      description: 创建定时消息响应
+      allOf:
+        - $ref: '#/components/schemas/RespComm'
+        - type: object
+          properties:
+            schedule_id:
+              type: string
+              description: 定时消息调度ID
+
+    GetScheduledMessageResp:
+      type: object
+      description: 获取定时消息响应
+      allOf:
+        - $ref: '#/components/schemas/RespComm'
+        - type: object
+          properties:
+            message:
+              $ref: '#/components/schemas/ScheduledMessage'
+
+    ListScheduledMessagesResp:
+      type: object
+      description: 定时消息列表响应
+      allOf:
+        - $ref: '#/components/schemas/RespComm'
+        - type: object
+          properties:
+            messages:
+              type: array
+              items:
+                $ref: '#/components/schemas/ScheduledMessage'
+              description: 定时消息列表
+            total:
+              type: integer
+              format: int64
+              description: 总数量
+            page:
+              type: integer
+              description: 当前页码
+
+    CancelScheduledMessageReq:
+      type: object
+      description: 取消定时消息请求
+      required:
+        - schedule_id
+      properties:
+        schedule_id:
+          type: string
+          description: 定时消息调度ID
+
+    CancelScheduledMessageResp:
+      type: object
+      description: 取消定时消息响应
+      allOf:
+        - $ref: '#/components/schemas/RespComm'

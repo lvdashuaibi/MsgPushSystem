@@ -1,0 +1,62 @@
+version: '3.8'
+
+services:
+  # Zookeeper（Kafka 依赖）
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.4.0
+    container_name: msgcenter_zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+    volumes:
+      - ./docker-compose/zookeeper/data:/var/lib/zookeeper/data
+      - ./docker-compose/zookeeper/logs:/var/lib/zookeeper/log
+    networks:
+      - kafka-network
+
+  # Kafka 服务
+  kafka:
+    image: confluentinc/cp-kafka:7.4.0
+    container_name: msgcenter_kafka
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_DELETE_TOPIC_ENABLE: "true"
+    ports:
+      - "9092:9092"
+    volumes:
+      - ./docker-compose/kafka/data:/var/lib/kafka/data
+    networks:
+      - kafka-network
+
+  # Kafka UI 服务（可选，用于管理和监控）
+  kafka-ui:
+    container_name: kafka-ui
+    image: provectuslabs/kafka-ui:latest
+    ports:
+      - 8899:8080
+    depends_on:
+      - kafka
+    environment:
+      DYNAMIC_CONFIG_ENABLED: 'true'
+      KAFKA_CLUSTERS_0_NAME: msgcenter_kafka
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+    networks:
+      - kafka-network
+
+# 自定义网络
+networks:
+  kafka-network:
+    driver: bridge

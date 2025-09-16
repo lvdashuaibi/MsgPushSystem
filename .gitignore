@@ -1,0 +1,297 @@
+# ==========================================
+# Go 相关文件
+# ==========================================
+
+# 编译后的二进制文件
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+msgcenter
+msgcenter.exe
+
+# Go 测试文件
+*.test
+*.out
+
+# Go 覆盖率文件
+*.cover
+*.coverprofile
+
+# Go 依赖目录
+vendor/
+
+# Go 模块缓存
+go.sum.backup
+
+# ==========================================
+# Node.js / 前端相关文件
+# ==========================================
+
+# 依赖目录
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# 构建输出
+dist/
+build/
+.output/
+.nuxt/
+.next/
+
+# 前端缓存和临时文件
+.cache/
+.parcel-cache/
+.vite/
+.rollup.cache/
+
+# 前端环境变量
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# 前端自动生成文件
+auto-imports.d.ts
+components.d.ts
+
+# ==========================================
+# 日志文件
+# ==========================================
+
+# 应用日志
+log/
+logs/
+*.log
+*.log.*
+
+# 系统日志
+/var/log/
+/tmp/
+
+# ==========================================
+# 数据库和缓存文件
+# ==========================================
+
+# MySQL 数据文件
+mysql/
+*.sql.backup
+*.dump
+
+# Redis 数据文件
+redis/
+*.rdb
+*.aof
+
+# SQLite 数据库
+*.db
+*.sqlite
+*.sqlite3
+
+# ==========================================
+# Docker 相关文件
+# ==========================================
+
+# Docker 卷数据
+kafka/
+zookeeper/
+elasticsearch/
+docker-compose/kafka/
+docker-compose/mysql/
+docker-compose/redis/
+docker-compose/zookeeper/
+
+# Docker 临时文件
+.dockerignore.backup
+
+# ==========================================
+# 配置文件（敏感信息）
+# ==========================================
+
+# 本地配置文件（包含敏感信息）
+config/config-local.toml
+config/config-prod.toml
+config/config-niuge.toml
+config/*-local.toml
+config/*-prod.toml
+config/*-niuge.toml
+config/*-private.toml
+
+# 环境配置
+.env.production
+.env.staging
+
+# 密钥文件
+*.key
+*.pem
+*.crt
+*.p12
+*.pfx
+
+# ==========================================
+# IDE 和编辑器文件
+# ==========================================
+
+# IntelliJ IDEA
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# Visual Studio Code
+.vscode/
+*.code-workspace
+
+# Cursor AI
+.cursor/
+.cursorignore
+
+# Vim
+*.swp
+*.swo
+*~
+
+# Emacs
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+auto-save-list
+tramp
+.\#*
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# ==========================================
+# 操作系统文件
+# ==========================================
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon?
+._*
+.Spotlight-V100
+.Trashes
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+*~
+.directory
+.Trash-*
+
+# ==========================================
+# 临时文件和缓存
+# ==========================================
+
+# 通用临时文件
+tmp/
+temp/
+*.tmp
+*.temp
+*.bak
+*.backup
+*.orig
+
+# PID 文件
+*.pid
+
+# 压缩文件
+*.zip
+*.tar.gz
+*.rar
+*.7z
+
+# ==========================================
+# 项目特定文件
+# ==========================================
+
+# 编译输出
+bin/
+build/
+target/
+
+# 测试覆盖率报告
+coverage/
+*.lcov
+
+# 性能分析文件
+*.prof
+*.pprof
+
+# 文档生成
+docs/build/
+site/
+
+# ==========================================
+# 安全和敏感文件
+# ==========================================
+
+# 密码和密钥
+password.txt
+secret.txt
+*.secret
+*.private
+
+# 证书文件
+*.csr
+*.der
+
+# 配置备份
+*.conf.backup
+*.toml.backup
+*.yaml.backup
+*.yml.backup
+
+# ==========================================
+# 开发工具文件
+# ==========================================
+
+# Air (Go 热重载工具)
+.air.toml
+tmp/
+
+# 测试工具
+.nyc_output/
+coverage.xml
+
+# Makefile 输出
+.make/
+
+# ==========================================
+# 云服务和部署文件
+# ==========================================
+
+# Terraform
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.lock.hcl
+
+# Kubernetes
+*.kubeconfig
+
+# Docker Compose 覆盖文件
+docker-compose.override.yml
+docker-compose.local.yml
+
+# ==========================================
+# 其他
+# ==========================================
+
+# 用户自定义忽略文件
+.gitignore.local
