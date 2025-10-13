@@ -10,15 +10,16 @@ import (
 	"strings"
 	"time"
 
-	"github.com/BitofferHub/msgcenter/src/config"
-	"github.com/BitofferHub/msgcenter/src/constant"
-	"github.com/BitofferHub/msgcenter/src/ctrl/ctrlmodel"
-	"github.com/BitofferHub/msgcenter/src/ctrl/handler"
-	"github.com/BitofferHub/msgcenter/src/ctrl/tools"
-	"github.com/BitofferHub/msgcenter/src/data"
-	"github.com/BitofferHub/pkg/middlewares/log"
-	"github.com/BitofferHub/pkg/utils"
 	"github.com/gin-gonic/gin"
+	"github.com/lvdashuaibi/MsgPushSystem/src/config"
+	"github.com/lvdashuaibi/MsgPushSystem/src/constant"
+	"github.com/lvdashuaibi/MsgPushSystem/src/ctrl/ctrlmodel"
+	"github.com/lvdashuaibi/MsgPushSystem/src/ctrl/handler"
+	"github.com/lvdashuaibi/MsgPushSystem/src/ctrl/tools"
+	"github.com/lvdashuaibi/MsgPushSystem/src/data"
+	"github.com/lvdashuaibi/MsgPushSystem/src/pkg/log"
+	"github.com/lvdashuaibi/MsgPushSystem/src/pkg/utils"
+	"github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
 )
 
@@ -349,7 +350,7 @@ func (p *SendMsgHandler) sendSingleToTimer(msgReq *ctrlmodel.SendMsgReq) (string
 	ctx := context.Background()
 
 	// 生成唯一的消息ID
-	msgID := utils.NewUuid()
+	msgID := utils.GenerateUUID()
 
 	// 将消息ID赋值给请求结构体
 	msgReq.MsgID = msgID
@@ -388,7 +389,7 @@ func (p *SendMsgHandler) sendSingleToTimer(msgReq *ctrlmodel.SendMsgReq) (string
 	// 存入 ZSET；
 	timeSocre := float64(msgReq.SendTimestamp)
 	member := fmt.Sprintf("%d", msgReq.SendTimestamp)
-	_, err = dt.GetCache().ZAdd(ctx, "Timer_Msgs", timeSocre, member)
+	err = dt.GetCache().ZAdd(ctx, "Timer_Msgs", redis.Z{Score: timeSocre, Member: member})
 	if err != nil {
 		return "", err
 	}
@@ -403,7 +404,7 @@ func (p *SendMsgHandler) sendSingleToMySQL(msgReq *ctrlmodel.SendMsgReq) (string
 	dt := data.GetData()
 
 	// 生成唯一的消息ID
-	msgID := utils.NewUuid()
+	msgID := utils.GenerateUUID()
 
 	// 创建一个新的消息队列实例
 	var md = new(data.MsgQueue)
@@ -459,7 +460,7 @@ func (p *SendMsgHandler) sendSingleToMQ(msgReq *ctrlmodel.SendMsgReq) (string, e
 	dt := data.GetData()
 
 	// 生成唯一的消息ID
-	msgID := utils.NewUuid()
+	msgID := utils.GenerateUUID()
 
 	// 将消息ID赋值给请求结构体
 	msgReq.MsgID = msgID
@@ -481,7 +482,7 @@ func (p *SendMsgHandler) sendSingleToMQ(msgReq *ctrlmodel.SendMsgReq) (string, e
 
 	// 根据消息优先级选择对应的消息队列生产者
 	producer := dt.GetProducer(data.PriorityEnum(msgReq.Priority))
-	sendErr = producer.SendMessage(msgJson)
+	sendErr = producer.SendMessage("", msgJson)
 	if sendErr != nil {
 		log.ErrorContextf(context.Background(), "发送消息到MQ失败: %s", sendErr.Error())
 		return "", sendErr

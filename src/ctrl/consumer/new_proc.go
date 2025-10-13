@@ -4,9 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/BitofferHub/msgcenter/src/ctrl/msgpush"
-	"github.com/BitofferHub/msgcenter/src/data"
-	"github.com/BitofferHub/pkg/middlewares/log"
+	"github.com/lvdashuaibi/MsgPushSystem/src/ctrl/msgpush"
+	"github.com/lvdashuaibi/MsgPushSystem/src/data"
+	"github.com/lvdashuaibi/MsgPushSystem/src/pkg/log"
 )
 
 type MsgIntf interface {

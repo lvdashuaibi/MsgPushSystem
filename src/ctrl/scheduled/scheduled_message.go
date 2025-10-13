@@ -8,13 +8,14 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/BitofferHub/msgcenter/src/constant"
-	"github.com/BitofferHub/msgcenter/src/ctrl/ctrlmodel"
-	"github.com/BitofferHub/msgcenter/src/ctrl/handler"
-	"github.com/BitofferHub/msgcenter/src/data"
-	"github.com/BitofferHub/pkg/middlewares/log"
-	"github.com/BitofferHub/pkg/utils"
 	"github.com/gin-gonic/gin"
+	"github.com/lvdashuaibi/MsgPushSystem/src/constant"
+	"github.com/lvdashuaibi/MsgPushSystem/src/ctrl/ctrlmodel"
+	"github.com/lvdashuaibi/MsgPushSystem/src/ctrl/handler"
+	"github.com/lvdashuaibi/MsgPushSystem/src/data"
+	"github.com/lvdashuaibi/MsgPushSystem/src/pkg/log"
+	"github.com/lvdashuaibi/MsgPushSystem/src/pkg/utils"
+	"github.com/redis/go-redis/v9"
 )
 
 // CreateScheduledMessageHandler 创建定时消息处理器
@@ -99,7 +100,7 @@ func (h *CreateScheduledMessageHandler) HandleProcess() error {
 	}
 
 	// 生成定时消息ID
-	scheduleID := utils.NewUuid()
+	scheduleID := utils.GenerateUUID()
 
 	// 序列化模板数据
 	templateDataJSON, _ := json.Marshal(h.Req.TemplateData)
@@ -131,7 +132,7 @@ func (h *CreateScheduledMessageHandler) HandleProcess() error {
 	// 添加到Redis定时队列
 	timeScore := float64(scheduledTime.Unix())
 	member := scheduleID
-	_, err = dt.GetCache().ZAdd(ctx, "Scheduled_Messages", timeScore, member)
+	err = dt.GetCache().ZAdd(ctx, "Scheduled_Messages", redis.Z{Score: timeScore, Member: member})
 	if err != nil {
 		log.Errorf("添加到Redis定时队列失败: %s", err.Error())
 		// 这里不返回错误，因为数据库已经保存成功，可以通过定时任务补偿
@@ -387,7 +388,7 @@ func (h *CancelScheduledMessageHandler) HandleProcess() error {
 
 	// 从Redis定时队列中移除
 	ctx := context.Background()
-	_, err := dt.GetCache().ZRem(ctx, "Scheduled_Messages", h.Req.ScheduleID)
+	err := dt.GetCache().ZRem(ctx, "Scheduled_Messages", h.Req.ScheduleID)
 	if err != nil {
 		log.Errorf("从Redis定时队列移除失败: %s", err.Error())
 		// 这里不返回错误，因为数据库状态已经更新

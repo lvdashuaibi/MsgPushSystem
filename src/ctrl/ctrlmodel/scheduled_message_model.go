@@ -1,7 +1,7 @@
 package ctrlmodel
 
 import (
-	"github.com/BitofferHub/msgcenter/src/data"
+	"github.com/lvdashuaibi/MsgPushSystem/src/data"
 )
 
 // CreateScheduledMessageReq 创建定时消息请求

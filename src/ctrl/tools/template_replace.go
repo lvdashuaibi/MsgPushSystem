@@ -3,7 +3,7 @@ package tools
 import (
 	"strings"
 
-	"github.com/BitofferHub/pkg/middlewares/log"
+	"github.com/lvdashuaibi/MsgPushSystem/src/pkg/log"
 )
 
 func TemplateReplace(templateContent string, data map[string]string) (string, error) {

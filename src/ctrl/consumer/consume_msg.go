@@ -9,13 +9,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/BitofferHub/msgcenter/src/config"
-	"github.com/BitofferHub/msgcenter/src/ctrl/ctrlmodel"
-	"github.com/BitofferHub/msgcenter/src/ctrl/tools"
-	"github.com/BitofferHub/msgcenter/src/data"
-	"github.com/BitofferHub/pkg/middlewares/lock"
-	"github.com/BitofferHub/pkg/middlewares/log"
-	"github.com/BitofferHub/pkg/middlewares/mq"
+	"github.com/lvdashuaibi/MsgPushSystem/src/config"
+	"github.com/lvdashuaibi/MsgPushSystem/src/ctrl/ctrlmodel"
+	"github.com/lvdashuaibi/MsgPushSystem/src/ctrl/tools"
+	"github.com/lvdashuaibi/MsgPushSystem/src/data"
+	"github.com/lvdashuaibi/MsgPushSystem/src/pkg/lock"
+	"github.com/lvdashuaibi/MsgPushSystem/src/pkg/log"
+	"github.com/lvdashuaibi/MsgPushSystem/src/pkg/mq"
 	"gorm.io/gorm"
 )
 
@@ -108,8 +108,7 @@ func (s *MsgConsume) startConsumer(priority data.PriorityEnum) {
 
 				// 如果是leader，在崩溃时尝试释放锁
 				if s.isLeader[priority] && s.locks[priority] != nil {
-					ctx := context.Background()
-					err := s.locks[priority].Unlock(ctx)
+					err := s.locks[priority].Unlock()
 					if err != nil {
 						log.Errorf("%s优先级消费者崩溃时解锁失败: %v", priorityStr, err)
 					} else {
@@ -143,7 +142,7 @@ func (s *MsgConsume) consumeFromMySQLWithLock(priority data.PriorityEnum) {
 	// 确保函数退出时释放锁
 	defer func() {
 		if s.isLeader[priority] && s.locks[priority] != nil {
-			err := s.locks[priority].Unlock(ctx)
+			err := s.locks[priority].Unlock()
 			if err != nil {
 				log.Errorf("%s优先级消费者函数退出时解锁失败: %v", priorityStr, err)
 			} else {
@@ -205,7 +204,8 @@ func (s *MsgConsume) consumeFromMQ(consumer mq.Consumer, priority data.PriorityE
 		go func() {
 			log.Infof("🚀 启动%s优先级消费者goroutine", priorityStr)
 			// 消费消息
-			consumer.ConsumeMessages(func(message []byte) error {
+			ctx := context.Background()
+			consumer.ConsumeMessages(ctx, func(message []byte) error {
 				// 创建一个新的上下文
 				ctx := context.Background()
 				// 记录日志
@@ -262,7 +262,7 @@ func (s *MsgConsume) handleMqRetryAfterFailure(ctx context.Context, req *ctrlmod
 	log.InfoContextf(ctx, "消息 %s 当前重试次数: %d/%d，加入重试队列",
 		req.MsgID, newCount, config.Conf.Common.MaxRetryCount)
 	// 扔进重试主题处理
-	data.GetData().GetRetryMQProducer().SendMessage(message)
+	data.GetData().GetRetryMQProducer().SendMessage("", message)
 	return nil // 返回nil，避免消息被重复消费
 }
 
@@ -527,12 +527,11 @@ func RandNum(num int64) int64 {
 
 // UnlockAll 释放所有持有的分布式锁
 func (s *MsgConsume) UnlockAll() {
-	ctx := context.Background()
 	for priority, isLeader := range s.isLeader {
 		// 只需要解锁自己是leader的锁
 		if isLeader && s.locks[priority] != nil {
 			priorityStr := data.GetPriorityStr(priority)
-			err := s.locks[priority].Unlock(ctx)
+			err := s.locks[priority].Unlock()
 			if err != nil {
 				log.Errorf("%s优先级消费者解锁失败: %v", priorityStr, err)
 			} else {

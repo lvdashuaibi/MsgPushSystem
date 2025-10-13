@@ -4,7 +4,7 @@ package msgpush
 import (
 	"encoding/json"
 	"fmt"
-	conf "github.com/BitofferHub/msgcenter/src/config"
+	conf "github.com/lvdashuaibi/MsgPushSystem/src/config"
 	openapi "github.com/alibabacloud-go/darabonba-openapi/v2/client"
 	dysmsapi20170525 "github.com/alibabacloud-go/dysmsapi-20170525/v4/client"
 	util "github.com/alibabacloud-go/tea-utils/v2/service"

@@ -54,11 +54,17 @@
       <!-- 主内容区域 -->
       <el-main class="main-content">
         <div class="content-header">
-          <el-breadcrumb separator="/">
-            <el-breadcrumb-item v-for="item in breadcrumbs" :key="item.path" :to="item.path">
+          <div class="custom-breadcrumb">
+            <span
+              v-for="(item, index) in breadcrumbs"
+              :key="item.path"
+              class="breadcrumb-item"
+              @click="handleBreadcrumbClick(item.path)"
+            >
               {{ item.title }}
-            </el-breadcrumb-item>
-          </el-breadcrumb>
+              <span v-if="index < breadcrumbs.length - 1" class="separator">/</span>
+            </span>
+          </div>
         </div>
 
         <div class="content-body">
@@ -94,27 +100,27 @@ const breadcrumbs = computed(() => {
   const breadcrumbs = [{ path: '/dashboard', title: '首页' }]
 
   if (path.startsWith('/messages')) {
-    breadcrumbs.push({ path: '/messages', title: '消息管理' })
-    if (path === '/messages/send') {
-      breadcrumbs.push({ path: '/messages/send', title: '发送消息' })
-    } else if (path === '/messages/templates') {
+    breadcrumbs.push({ path: '/messages/send', title: '消息管理' })
+    if (path === '/messages/templates') {
       breadcrumbs.push({ path: '/messages/templates', title: '消息模板' })
     } else if (path === '/messages/records') {
       breadcrumbs.push({ path: '/messages/records', title: '消息记录' })
+    } else if (path === '/messages/send') {
+      breadcrumbs.push({ path: '/messages/send', title: '发送消息' })
     }
   } else if (path.startsWith('/users')) {
-    breadcrumbs.push({ path: '/users', title: '用户管理' })
-    if (path === '/users/list') {
-      breadcrumbs.push({ path: '/users/list', title: '用户列表' })
-    } else if (path === '/users/tags') {
+    breadcrumbs.push({ path: '/users/list', title: '用户管理' })
+    if (path === '/users/tags') {
       breadcrumbs.push({ path: '/users/tags', title: '标签管理' })
+    } else if (path === '/users/list') {
+      breadcrumbs.push({ path: '/users/list', title: '用户列表' })
     }
   } else if (path.startsWith('/scheduled')) {
-    breadcrumbs.push({ path: '/scheduled', title: '定时消息' })
-    if (path === '/scheduled/list') {
-      breadcrumbs.push({ path: '/scheduled/list', title: '定时列表' })
-    } else if (path === '/scheduled/create') {
+    breadcrumbs.push({ path: '/scheduled/list', title: '定时消息' })
+    if (path === '/scheduled/create') {
       breadcrumbs.push({ path: '/scheduled/create', title: '创建定时消息' })
+    } else if (path === '/scheduled/list') {
+      breadcrumbs.push({ path: '/scheduled/list', title: '定时列表' })
     }
   }
 
@@ -124,6 +130,15 @@ const breadcrumbs = computed(() => {
 // 菜单选择处理
 const handleMenuSelect = (index: string) => {
   router.push(index)
+}
+
+// 面包屑点击处理
+const handleBreadcrumbClick = (path: string, event?: Event) => {
+  if (event) {
+    event.preventDefault()
+    event.stopPropagation()
+  }
+  router.push(path)
 }
 </script>
 
@@ -200,5 +215,32 @@ const handleMenuSelect = (index: string) => {
 :deep(.el-breadcrumb__item:last-child .el-breadcrumb__inner) {
   color: #1890ff;
   font-weight: 500;
+}
+
+.custom-breadcrumb {
+  display: flex;
+  align-items: center;
+  font-size: 14px;
+  color: #666;
+}
+
+.breadcrumb-item {
+  cursor: pointer;
+  color: #666;
+  transition: color 0.3s;
+}
+
+.breadcrumb-item:hover {
+  color: #1890ff;
+}
+
+.breadcrumb-item:last-child {
+  color: #1890ff;
+  font-weight: 500;
+}
+
+.separator {
+  margin: 0 8px;
+  color: #ccc;
 }
 </style>

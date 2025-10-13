@@ -4,8 +4,8 @@ import (
 	"crypto/tls"
 	"sync"
 
-	"github.com/BitofferHub/msgcenter/src/config"
-	"github.com/BitofferHub/pkg/middlewares/log"
+	"github.com/lvdashuaibi/MsgPushSystem/src/config"
+	"github.com/lvdashuaibi/MsgPushSystem/src/pkg/log"
 	"gopkg.in/gomail.v2"
 )
 

@@ -1,9 +1,9 @@
 package initialize
 
 import (
-	"github.com/BitofferHub/msgcenter/src/ctrl/msg"
-	"github.com/BitofferHub/msgcenter/src/ctrl/scheduled"
-	"github.com/BitofferHub/msgcenter/src/ctrl/user"
+	"github.com/lvdashuaibi/MsgPushSystem/src/ctrl/msg"
+	"github.com/lvdashuaibi/MsgPushSystem/src/ctrl/scheduled"
+	"github.com/lvdashuaibi/MsgPushSystem/src/ctrl/user"
 	"github.com/gin-gonic/gin"
 )
 

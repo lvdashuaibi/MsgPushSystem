@@ -1,6 +1,6 @@
 package ctrlmodel
 
-import "github.com/BitofferHub/msgcenter/src/data"
+import "github.com/lvdashuaibi/MsgPushSystem/src/data"
 
 // CreateUserReq 创建用户请求
 type CreateUserReq struct {

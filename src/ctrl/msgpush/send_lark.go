@@ -7,7 +7,7 @@ import (
 	"io/ioutil"
 	"net/http"
 
-	"github.com/BitofferHub/msgcenter/src/config"
+	"github.com/lvdashuaibi/MsgPushSystem/src/config"
 )
 
 func GetAccessToken() (string, error) {

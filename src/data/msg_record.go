@@ -3,7 +3,7 @@ package data
 import (
 	"time"
 
-	"github.com/BitofferHub/pkg/middlewares/log"
+	"github.com/lvdashuaibi/MsgPushSystem/src/pkg/log"
 	"gorm.io/gorm"
 )
 

@@ -183,7 +183,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import dayjs from 'dayjs'
-import { getMessageRecord, getMessageRecordList } from '@/api/message'
+import { getMessageRecord, getMsgRecordList } from '@/api/message'
 
 // 搜索表单
 const searchForm = reactive({
@@ -289,7 +289,7 @@ const loadRecordList = async () => {
       params.end_time = searchForm.dateRange[1]
     }
 
-    const response = await getMessageRecordList(params)
+    const response = await getMsgRecordList(params)
 
     // 转换数据格式
     const records = response.data?.records || []

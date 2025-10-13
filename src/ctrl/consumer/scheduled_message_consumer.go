@@ -6,9 +6,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/BitofferHub/msgcenter/src/ctrl/ctrlmodel"
-	"github.com/BitofferHub/msgcenter/src/data"
-	"github.com/BitofferHub/pkg/utils"
+	"github.com/lvdashuaibi/MsgPushSystem/src/ctrl/ctrlmodel"
+	"github.com/lvdashuaibi/MsgPushSystem/src/data"
+	"github.com/lvdashuaibi/MsgPushSystem/src/pkg/utils"
+	"github.com/redis/go-redis/v9"
 )
 
 // ScheduledMessageConsumer 定时消息消费者
@@ -77,7 +78,10 @@ func (s *ScheduledMessageConsumer) processScheduledMessages() {
 	currentScore := float64(now.Unix())
 
 	// 从Redis ZSET中获取到期的消息ID（分数 <= 当前时间戳）
-	scheduleIDs, err := dt.GetCache().ZRangeByScore(ctx, "Scheduled_Messages", "0", fmt.Sprintf("%.0f", currentScore))
+	scheduleIDs, err := dt.GetCache().ZRangeByScore(ctx, "Scheduled_Messages", &redis.ZRangeBy{
+		Min: "0",
+		Max: fmt.Sprintf("%.0f", currentScore),
+	})
 	if err != nil {
 		s.logger.Error("从Redis获取待发送定时消息失败: %s", err.Error())
 		if s.fileLogger != nil {
@@ -241,7 +245,7 @@ func (s *ScheduledMessageConsumer) sendMessageToQueue(req *ctrlmodel.SendMsgReq)
 	dt := data.GetData()
 
 	// 生成消息ID
-	req.MsgID = utils.NewUuid()
+	req.MsgID = utils.GenerateUUID()
 
 	// 序列化消息
 	msgJSON, err := json.Marshal(req)
@@ -251,5 +255,5 @@ func (s *ScheduledMessageConsumer) sendMessageToQueue(req *ctrlmodel.SendMsgReq)
 
 	// 发送到中等优先级队列
 	producer := dt.GetProducer(data.PRIORITY_MIDDLE)
-	return producer.SendMessage(msgJSON)
+	return producer.SendMessage("", msgJSON)
 }

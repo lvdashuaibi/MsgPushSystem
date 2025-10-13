@@ -3,12 +3,12 @@ package msg
 import (
 	"net/http"
 
-	"github.com/BitofferHub/msgcenter/src/constant"
-	"github.com/BitofferHub/msgcenter/src/ctrl/ctrlmodel"
-	"github.com/BitofferHub/msgcenter/src/ctrl/handler"
-	"github.com/BitofferHub/msgcenter/src/data"
-	"github.com/BitofferHub/pkg/middlewares/log"
-	"github.com/BitofferHub/pkg/utils"
+	"github.com/lvdashuaibi/MsgPushSystem/src/constant"
+	"github.com/lvdashuaibi/MsgPushSystem/src/ctrl/ctrlmodel"
+	"github.com/lvdashuaibi/MsgPushSystem/src/ctrl/handler"
+	"github.com/lvdashuaibi/MsgPushSystem/src/data"
+	"github.com/lvdashuaibi/MsgPushSystem/src/pkg/log"
+	"github.com/lvdashuaibi/MsgPushSystem/src/pkg/utils"
 	"github.com/gin-gonic/gin"
 )
 
@@ -85,7 +85,7 @@ func (p *CreateTemplateHandler) HandleProcess() error {
 	// 创建一个新的 MsgTemplate 实例
 	var mt = new(data.MsgTemplate)
 	// 生成一个新的 UUID 作为模板 ID
-	templateID := utils.NewUuid()
+	templateID := utils.GenerateUUID()
 	// 设置模板 ID
 	mt.TemplateID = templateID
 	// 设置模板名称

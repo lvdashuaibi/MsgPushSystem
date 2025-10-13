@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/BitofferHub/pkg/middlewares/log"
+	"github.com/lvdashuaibi/MsgPushSystem/src/pkg/log"
 )
 
 // ScheduledLogger 定时任务专用日志器

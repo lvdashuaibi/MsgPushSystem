@@ -6,12 +6,13 @@ import (
 	"fmt"
 	"time"
 
-	conf "github.com/BitofferHub/msgcenter/src/config"
-	"github.com/BitofferHub/pkg/middlewares/cache"
-	"github.com/BitofferHub/pkg/middlewares/gormcli"
-	"github.com/BitofferHub/pkg/middlewares/log"
-	"github.com/BitofferHub/pkg/middlewares/mq"
 	_ "github.com/go-sql-driver/mysql"
+	conf "github.com/lvdashuaibi/MsgPushSystem/src/config"
+	"github.com/lvdashuaibi/MsgPushSystem/src/pkg/cache"
+	"github.com/lvdashuaibi/MsgPushSystem/src/pkg/gormcli"
+	"github.com/lvdashuaibi/MsgPushSystem/src/pkg/lock"
+	"github.com/lvdashuaibi/MsgPushSystem/src/pkg/log"
+	"github.com/lvdashuaibi/MsgPushSystem/src/pkg/mq"
 	"gorm.io/gorm"
 )
 
@@ -141,6 +142,9 @@ func NewData(cf *conf.TomlConfig) (*Data, error) {
 		cache.WithPassWord(cf.Redis.Pwd),
 		cache.WithDB(0),
 	)
+
+	// 初始化分布式锁
+	lock.InitRedsync(cache.GetRedisCli().GetClient())
 	producers := generateProducer(cf)
 	consumers := generateConsumer(cf)
 
@@ -167,7 +171,7 @@ func generateProducer(cf *conf.TomlConfig) map[PriorityEnum]mq.Producer {
 			mq.WithTopic(topicConfig.Name),
 			mq.WithAck(int8(topicConfig.Ack)),
 			mq.WithGroupID(topicConfig.GroupID),
-			mq.WithPartition(topicConfig.Partition),
+			mq.WithPartition(int32(topicConfig.Partition)),
 			mq.WithAsync())
 
 		if producer == nil {
@@ -188,7 +192,7 @@ func generateConsumer(cf *conf.TomlConfig) map[PriorityEnum]mq.Consumer {
 			mq.WithBrokers(cf.Kafka.Brokers),
 			mq.WithTopic(topicConfig.Name),
 			mq.WithGroupID(topicConfig.GroupID),
-			mq.WithPartition(topicConfig.Partition),
+			mq.WithPartition(int32(topicConfig.Partition)),
 		}
 
 		// 如果配置了消费者组ID，则添加

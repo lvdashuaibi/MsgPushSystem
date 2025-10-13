@@ -1,21 +1,25 @@
-module github.com/BitofferHub/msgcenter
+module github.com/lvdashuaibi/MsgPushSystem
 
 go 1.16
 
 require (
-	github.com/BitofferHub/pkg v1.0.4-0.20250309173352-4b00715c9634
 	github.com/BurntSushi/toml v1.2.1
+	github.com/IBM/sarama v1.42.1
 	github.com/alibabacloud-go/darabonba-openapi/v2 v2.0.10
 	github.com/alibabacloud-go/dysmsapi-20170525/v4 v4.1.1
 	github.com/alibabacloud-go/tea v1.2.2
 	github.com/alibabacloud-go/tea-utils/v2 v2.0.7
 	github.com/gin-gonic/gin v1.9.1
+	github.com/go-redsync/redsync/v4 v4.8.1
 	github.com/go-sql-driver/mysql v1.7.0
-	github.com/jonboulle/clockwork v0.4.0 // indirect
+	github.com/google/uuid v1.5.0
 	github.com/redis/go-redis/v9 v9.7.0
+	github.com/sirupsen/logrus v1.9.3
 	gopkg.in/alexcesaro/quotedprintable.v3 v3.0.0-20150716171945-2caba252f4dc // indirect
 	gopkg.in/gomail.v2 v2.0.0-20160411212932-81ebce5c23df
+	gorm.io/driver/mysql v1.5.2
 	gorm.io/gorm v1.25.5
+	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 )
 
 replace github.com/go-critic/go-critic v0.0.0-20181204210945-ee9bf5809ead => github.com/go-critic/go-critic v0.4.4-0.20200527115708-e76e5c043d31

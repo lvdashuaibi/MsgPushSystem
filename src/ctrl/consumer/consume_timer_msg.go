@@ -3,16 +3,17 @@ package consumer
 import (
 	"context"
 	"encoding/json"
-	"github.com/BitofferHub/pkg/middlewares/lock"
 	"strconv"
 	"time"
 
-	"github.com/BitofferHub/msgcenter/src/config"
-	"github.com/BitofferHub/msgcenter/src/constant"
-	"github.com/BitofferHub/msgcenter/src/ctrl/ctrlmodel"
-	"github.com/BitofferHub/msgcenter/src/ctrl/tools"
-	"github.com/BitofferHub/msgcenter/src/data"
-	"github.com/BitofferHub/pkg/middlewares/log"
+	"github.com/lvdashuaibi/MsgPushSystem/src/pkg/lock"
+
+	"github.com/lvdashuaibi/MsgPushSystem/src/config"
+	"github.com/lvdashuaibi/MsgPushSystem/src/constant"
+	"github.com/lvdashuaibi/MsgPushSystem/src/ctrl/ctrlmodel"
+	"github.com/lvdashuaibi/MsgPushSystem/src/ctrl/tools"
+	"github.com/lvdashuaibi/MsgPushSystem/src/data"
+	"github.com/lvdashuaibi/MsgPushSystem/src/pkg/log"
 )
 
 type TimerMsgConsume struct {
@@ -84,13 +85,12 @@ func (s *TimerMsgConsume) consumeTimerMsg() {
 	dt := data.GetData()
 	now := time.Now().Unix()
 	//msgList, err := dt.GetCache().ZRangeByScore(ctx, "Timer_Msgs", "0", strconv.FormatInt(time.Now().UnixMilli(), 10))
-	result, err := dt.GetCache().EvalResults(ctx, constant.LUA_ZRANGEBYSCORE_AND_REM,
+	timeList, err := dt.GetCache().EvalResults(ctx, constant.LUA_ZRANGEBYSCORE_AND_REM,
 		[]string{"Timer_Msgs"}, []interface{}{"0", strconv.FormatInt(now, 10)})
 	if err != nil {
 		return
 	}
-	timeList, ok := result.([]interface{})
-	if !ok || len(timeList) == 0 {
+	if len(timeList) == 0 {
 		return
 	}
 
@@ -254,17 +254,17 @@ func sendToMQ(ctx context.Context, req *ctrlmodel.SendMsgReq) error {
 		// 获取低优先级消息队列生产者
 		producer := dt.GetLowMQProducer()
 		// 发送消息到低优先级消息队列
-		return producer.SendMessage(msgJson)
+		return producer.SendMessage("", msgJson)
 	} else if req.Priority == int(data.PRIORITY_MIDDLE) {
 		// 获取中优先级消息队列生产者
 		producer := dt.GetMiddleMQProducer()
 		// 发送消息到中优先级消息队列
-		return producer.SendMessage(msgJson)
+		return producer.SendMessage("", msgJson)
 	} else if req.Priority == int(data.PRIORITY_HIGH) {
 		// 获取高优先级消息队列生产者
 		producer := dt.GetHighMQProducer()
 		// 发送消息到高优先级消息队列
-		return producer.SendMessage(msgJson)
+		return producer.SendMessage("", msgJson)
 	}
 	// 返回nil，表示发送成功
 	return nil

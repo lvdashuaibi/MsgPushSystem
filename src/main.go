@@ -6,12 +6,12 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/BitofferHub/msgcenter/src/config"
-	"github.com/BitofferHub/msgcenter/src/ctrl/consumer"
-	"github.com/BitofferHub/msgcenter/src/data"
-	"github.com/BitofferHub/msgcenter/src/initialize"
-	"github.com/BitofferHub/pkg/middlewares/log"
 	"github.com/gin-gonic/gin"
+	"github.com/lvdashuaibi/MsgPushSystem/src/config"
+	"github.com/lvdashuaibi/MsgPushSystem/src/ctrl/consumer"
+	"github.com/lvdashuaibi/MsgPushSystem/src/data"
+	"github.com/lvdashuaibi/MsgPushSystem/src/initialize"
+	"github.com/lvdashuaibi/MsgPushSystem/src/pkg/log"
 )
 
 func main() {

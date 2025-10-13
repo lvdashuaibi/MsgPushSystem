@@ -5,8 +5,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/BitofferHub/pkg/middlewares/log"
 	"github.com/BurntSushi/toml"
+	"github.com/lvdashuaibi/MsgPushSystem/src/pkg/log"
 )
 
 var Conf *TomlConfig
