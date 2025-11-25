@@ -58,7 +58,7 @@ func (s *TimerMsgConsume) consumeFromTimer(ctx context.Context) {
 			time.Sleep(time.Second * LOCK_TIMER_RETRY_INTERVAL_SECONDS)
 			s.isLeader = s.tryBeLeader(ctx)
 			if s.isLeader {
-				log.Infof("%s定时消费者从备用节点升级为主节点")
+				log.Infof("定时消费者从备用节点升级为主节点")
 			}
 		}
 	}
@@ -71,11 +71,11 @@ func (s *TimerMsgConsume) tryBeLeader(ctx context.Context) bool {
 	// 尝试获取锁
 	err := redisLock.Lock(ctx)
 	if err != nil {
-		log.Infof("%s定时消费者未能获取到主节点锁: %v", err)
+		log.Infof("定时消费者未能获取到主节点锁: %v", err)
 		return false
 	}
 
-	log.Infof("%s定时消费者成功获取主节点锁，成为主消费者")
+	log.Infof("定时消费者成功获取主节点锁，成为主消费者")
 	return true
 }
 
