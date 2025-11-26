@@ -157,6 +157,15 @@ start_docker() {
         fi
     fi
 
+    # 在启动前再次检查并清理可能存在的旧数据
+    if [ -d "docker-compose/kafka/data" ]; then
+        # 检查meta.properties文件是否存在
+        if [ -f "docker-compose/kafka/data/meta.properties" ]; then
+            log_info "检测到Kafka旧数据，预防性清理..."
+            rm -rf docker-compose/kafka/data docker-compose/zookeeper/data docker-compose/zookeeper/logs 2>/dev/null || true
+        fi
+    fi
+
     log_info "启动MySQL、Redis、Kafka等基础服务..."
     if [ "$DETACH_MODE" = true ]; then
         docker-compose up -d
