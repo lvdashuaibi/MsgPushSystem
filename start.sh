@@ -137,6 +137,24 @@ start_docker() {
     if [ "$CLEAN_MODE" = true ]; then
         log_info "清理Docker容器和卷..."
         docker-compose down -v --remove-orphans 2>/dev/null || true
+        # 清理Kafka数据目录以避免集群ID不匹配问题
+        log_info "清理Kafka和Zookeeper数据目录..."
+        rm -rf docker-compose/kafka/data docker-compose/zookeeper/data docker-compose/zookeeper/logs 2>/dev/null || true
+    else
+        # 检查Kafka是否因为集群ID不匹配而无法启动
+        if docker ps -a | grep -q msgcenter_kafka; then
+            local kafka_status=$(docker inspect -f '{{.State.Status}}' msgcenter_kafka 2>/dev/null || echo "not_found")
+            if [ "$kafka_status" = "exited" ]; then
+                log_warn "检测到Kafka容器异常退出，检查是否需要清理数据..."
+                local last_error=$(docker logs msgcenter_kafka 2>&1 | grep -i "InconsistentClusterIdException" || echo "")
+                if [ ! -z "$last_error" ]; then
+                    log_warn "检测到Kafka集群ID不匹配，自动清理数据目录..."
+                    docker-compose down 2>/dev/null || true
+                    rm -rf docker-compose/kafka/data docker-compose/zookeeper/data docker-compose/zookeeper/logs 2>/dev/null || true
+                    log_info "Kafka数据已清理，将重新初始化..."
+                fi
+            fi
+        fi
     fi
 
     log_info "启动MySQL、Redis、Kafka等基础服务..."
@@ -158,7 +176,22 @@ start_docker() {
     while ! docker-compose exec -T mysql mysqladmin ping -h localhost -u root -prootpass &> /dev/null; do
         if [ $retry_count -ge 30 ]; then
             log_error "MySQL启动超时"
+            log_error "请检查Docker日志: docker-compose logs mysql"
             exit 1
+        fi
+        echo -n "."
+        sleep 2
+        ((retry_count++))
+    done
+    echo ""
+
+    # 等待Kafka启动完成
+    log_info "等待Kafka启动完成..."
+    retry_count=0
+    while ! docker-compose exec -T kafka bash -c "kafka-topics --bootstrap-server kafka:9093 --list" &> /dev/null; do
+        if [ $retry_count -ge 30 ]; then
+            log_warn "Kafka启动超时，但继续启动其他服务..."
+            break
         fi
         echo -n "."
         sleep 2
@@ -212,10 +245,10 @@ start_backend() {
 
     log_step "启动后端服务..."
 
-    cd "$BACKEND_DIR"
+    cd "$PROJECT_ROOT"
 
     # 检查配置文件
-    local config_file="../config/config-${CONFIG}.toml"
+    local config_file="./config/config-${CONFIG}.toml"
     if [ ! -f "$config_file" ]; then
         log_error "配置文件不存在: $config_file"
         exit 1
@@ -224,14 +257,27 @@ start_backend() {
     log_info "使用配置: $CONFIG"
     log_info "后端服务将在 http://localhost:8109 启动"
 
+    # 检查是否已有后端进程在运行
+    if [ -f "log/backend.pid" ]; then
+        local old_pid=$(cat log/backend.pid)
+        if kill -0 "$old_pid" 2>/dev/null; then
+            log_warn "后端进程已在运行 (PID: $old_pid)，先停止旧进程..."
+            kill "$old_pid" 2>/dev/null || true
+            sleep 2
+            if kill -0 "$old_pid" 2>/dev/null; then
+                kill -9 "$old_pid" 2>/dev/null || true
+            fi
+        fi
+    fi
+
     if [ "$DETACH_MODE" = true ]; then
-        nohup ../msgcenter "$CONFIG" > ../log/backend.log 2>&1 &
-        echo $! > ../log/backend.pid
-        log_info "后端服务已在后台启动，PID: $(cat ../log/backend.pid)"
+        nohup ./bin/main --config="$config_file" > log/backend.log 2>&1 &
+        echo $! > log/backend.pid
+        log_info "后端服务已在后台启动，PID: $(cat log/backend.pid)"
     else
-        ../msgcenter "$CONFIG" &
+        ./bin/main --config="$config_file" &
         BACKEND_PID=$!
-        echo $BACKEND_PID > ../log/backend.pid
+        echo $BACKEND_PID > log/backend.pid
     fi
 
     # 等待后端启动
@@ -240,6 +286,7 @@ start_backend() {
     while ! curl -s http://localhost:8109/user/tag_statistics > /dev/null 2>&1; do
         if [ $retry_count -ge 30 ]; then
             log_error "后端服务启动超时"
+            log_error "请查看日志: tail -f log/backend.log"
             exit 1
         fi
         echo -n "."
@@ -284,14 +331,27 @@ start_frontend() {
 
     log_info "前端服务将在 http://localhost:3000 启动"
 
+    # 检查是否已有前端进程在运行
+    if [ -f "$PROJECT_ROOT/log/frontend.pid" ]; then
+        local old_pid=$(cat "$PROJECT_ROOT/log/frontend.pid")
+        if kill -0 "$old_pid" 2>/dev/null; then
+            log_warn "前端进程已在运行 (PID: $old_pid)，先停止旧进程..."
+            kill "$old_pid" 2>/dev/null || true
+            sleep 2
+            if kill -0 "$old_pid" 2>/dev/null; then
+                kill -9 "$old_pid" 2>/dev/null || true
+            fi
+        fi
+    fi
+
     if [ "$DETACH_MODE" = true ]; then
-        nohup npm run dev > ../log/frontend.log 2>&1 &
-        echo $! > ../log/frontend.pid
-        log_info "前端服务已在后台启动，PID: $(cat ../log/frontend.pid)"
+        nohup npm run dev > "$PROJECT_ROOT/log/frontend.log" 2>&1 &
+        echo $! > "$PROJECT_ROOT/log/frontend.pid"
+        log_info "前端服务已在后台启动，PID: $(cat "$PROJECT_ROOT/log/frontend.pid")"
     else
         npm run dev &
         FRONTEND_PID=$!
-        echo $FRONTEND_PID > ../log/frontend.pid
+        echo $FRONTEND_PID > "$PROJECT_ROOT/log/frontend.pid"
     fi
 
     # 等待前端启动
@@ -300,6 +360,7 @@ start_frontend() {
     while ! curl -s http://localhost:3000 > /dev/null 2>&1; do
         if [ $retry_count -ge 30 ]; then
             log_error "前端服务启动超时"
+            log_error "请查看日志: tail -f log/frontend.log"
             exit 1
         fi
         echo -n "."

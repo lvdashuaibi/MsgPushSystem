@@ -126,18 +126,22 @@ stop_docker() {
         log_info "停止并清理Docker容器和卷..."
         docker-compose down -v --remove-orphans 2>/dev/null || true
 
+        # 清理Kafka和Zookeeper数据目录以避免集群ID不匹配问题
+        log_info "清理Kafka和Zookeeper数据目录..."
+        rm -rf "./docker-compose/kafka/data" "./docker-compose/zookeeper/data" "./docker-compose/zookeeper/logs" 2>/dev/null || true
+
         # 清理未使用的镜像和网络
         log_info "清理未使用的Docker资源..."
         docker system prune -f 2>/dev/null || true
     else
         log_info "停止Docker容器..."
         docker-compose down 2>/dev/null || true
-    fi
 
-    # 总是清理Kafka数据目录以避免集群ID不匹配问题
-    if [ -d "./docker-compose/kafka/data" ]; then
-        log_info "清理Kafka数据目录以避免集群ID不匹配问题..."
-        rm -rf "./docker-compose/kafka/data"
+        # 检查是否有Kafka集群ID不匹配的问题
+        if docker logs msgcenter_kafka 2>&1 | grep -q "InconsistentClusterIdException"; then
+            log_warn "检测到Kafka集群ID不匹配问题"
+            log_warn "建议使用 './stop.sh --clean' 清理数据后重新启动"
+        fi
     fi
 
     log_success "Docker服务已停止"

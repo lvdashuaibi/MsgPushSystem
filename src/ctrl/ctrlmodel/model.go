@@ -17,6 +17,9 @@ type SendMsgReq struct {
 	TemplateData  map[string]string `json:"templateData" form:"templateData"`
 	SendTimestamp int64             `json:"sendTimestamp" form:"sendTimestamp"`
 	MsgID         string
+	// 直接编写消息模式字段
+	Channels []int  `json:"channels" form:"channels"` // 消息渠道列表 (1:邮件, 2:短信, 3:飞书, 4:微信, 5:钉钉) - 支持多选
+	Content  string `json:"content" form:"content"`   // 消息内容（直接编写模式）
 }
 
 // SendMsgResp 响应消息

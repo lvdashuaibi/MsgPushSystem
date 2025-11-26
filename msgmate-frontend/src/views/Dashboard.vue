@@ -85,7 +85,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted, reactive } from 'vue'
 import { ElMessage } from 'element-plus'
 import {
   Message,
@@ -171,19 +171,15 @@ const fetchStats = async () => {
   }
 }
 
-onMounted(() => {
-  console.log('Dashboard mounted')
-  fetchStats()
-})
-
-// 1. 实时数据更新
+// 实时数据更新
 const updateInterval = ref<NodeJS.Timeout>()
 
 onMounted(() => {
-  loadStats()
+  console.log('Dashboard mounted')
+  fetchStats()
   // 每30秒更新一次数据
   updateInterval.value = setInterval(() => {
-    loadStats()
+    fetchStats()
   }, 30000)
 })
 
@@ -192,23 +188,6 @@ onUnmounted(() => {
     clearInterval(updateInterval.value)
   }
 })
-
-// 2. 添加更多统计指标
-const extendedStats = reactive({
-  todayMessages: 0,
-  successRate: 0,
-  avgResponseTime: 0,
-  activeUsers: 0,
-  channelDistribution: {
-    email: 0,
-    sms: 0,
-    lark: 0
-  },
-  hourlyData: [] as Array<{hour: string, count: number}>
-})
-
-// 3. 添加图表组件
-// 在 template 中添加 ECharts 图表展示
 </script>
 
 <style scoped>

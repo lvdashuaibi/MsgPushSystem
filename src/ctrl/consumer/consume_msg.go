@@ -268,58 +268,99 @@ func (s *MsgConsume) handleMqRetryAfterFailure(ctx context.Context, req *ctrlmod
 
 // dealOneMsg 处理一条消息
 func dealOneMsg(ctx context.Context, req *ctrlmodel.SendMsgReq) error {
-	log.InfoContextf(ctx, "🔍 开始处理消息，MsgID: %s, TemplateID: %s", req.MsgID, req.TemplateID)
+	log.InfoContextf(ctx, "🔍 开始处理消息，MsgID: %s, TemplateID: %s, Channels: %v, Content: %s",
+		req.MsgID, req.TemplateID, req.Channels, req.Content)
 
 	// 获取数据实例
 	dt := data.GetData()
 
-	log.InfoContextf(ctx, "📋 获取消息模板，TemplateID: %s", req.TemplateID)
-	tp, err := dt.GetMsgTemplate(ctx, req.TemplateID)
-	if err != nil {
-		log.ErrorContextf(ctx, "❌ 获取消息模板失败: %s", err.Error())
-		return err
-	}
-	log.InfoContextf(ctx, "✅ 获取消息模板成功，Channel: %d, Subject: %s, Content长度: %d", tp.Channel, tp.Subject, len(tp.Content))
-
-	// 替换模板中的变量
+	var tp *data.MsgTemplate
 	var content string
-	if tp.Channel == int(data.Channel_EMAIL) || tp.Channel == int(data.Channel_LARK) {
-		log.InfoContextf(ctx, "🔄 开始模板变量替换，原内容: %s", tp.Content)
-		content, err = tools.TemplateReplace(tp.Content, req.TemplateData)
+	var subject string
+	var channels []int
+	var err error
+
+	// 判断是模板模式还是直接发送模式
+	if req.TemplateID != "" {
+		// 模板模式
+		log.InfoContextf(ctx, "📋 模板模式：获取消息模板，TemplateID: %s", req.TemplateID)
+		tp, err = dt.GetMsgTemplate(ctx, req.TemplateID)
 		if err != nil {
-			log.ErrorContextf(ctx, "❌ 模板变量替换失败: %s", err.Error())
+			log.ErrorContextf(ctx, "❌ 获取消息模板失败: %s", err.Error())
 			return err
 		}
-		log.InfoContextf(ctx, "✅ 模板变量替换成功，替换后内容: %s", content)
+		log.InfoContextf(ctx, "✅ 获取消息模板成功，Channel: %d, Subject: %s, Content长度: %d",
+			tp.Channel, tp.Subject, len(tp.Content))
+
+		// 替换模板中的变量
+		if tp.Channel == int(data.Channel_EMAIL) || tp.Channel == int(data.Channel_LARK) {
+			log.InfoContextf(ctx, "🔄 开始模板变量替换，原内容: %s", tp.Content)
+			content, err = tools.TemplateReplace(tp.Content, req.TemplateData)
+			if err != nil {
+				log.ErrorContextf(ctx, "❌ 模板变量替换失败: %s", err.Error())
+				return err
+			}
+			log.InfoContextf(ctx, "✅ 模板变量替换成功，替换后内容: %s", content)
+		}
+		subject = tp.Subject
+		channels = []int{tp.Channel}
+	} else if req.Content != "" && len(req.Channels) > 0 {
+		// 直接发送模式
+		log.InfoContextf(ctx, "📝 直接发送模式：使用请求中的内容和渠道")
+		content = req.Content
+		subject = req.Subject
+		channels = req.Channels
+		log.InfoContextf(ctx, "✅ 直接发送参数：Channels: %v, Subject: %s, Content: %s",
+			channels, subject, content)
+	} else {
+		log.ErrorContextf(ctx, "❌ 既没有模板ID也没有直接发送内容")
+		return errors.New("neither template nor direct content provided")
 	}
 
-	// 根据通道类型获取消息处理器
-	log.InfoContextf(ctx, "🔍 查找消息处理器，Channel: %d", tp.Channel)
-	handler, ok := msgProcMap[tp.Channel]
-	if !ok {
-		log.ErrorContextf(ctx, "❌ 不支持的渠道类型: %d", tp.Channel)
-		return errors.New("channel not support")
+	// 遍历所有渠道发送消息
+	var lastErr error
+	successCount := 0
+	for _, channel := range channels {
+		// 根据通道类型获取消息处理器
+		log.InfoContextf(ctx, "🔍 查找消息处理器，Channel: %d", channel)
+		handler, ok := msgProcMap[channel]
+		if !ok {
+			log.ErrorContextf(ctx, "❌ 不支持的渠道类型: %d", channel)
+			lastErr = fmt.Errorf("channel %d not support", channel)
+			continue
+		}
+		log.InfoContextf(ctx, "✅ 找到消息处理器，Channel: %d", channel)
+
+		// 创建消息处理器实例
+		t := handler.NewProc()
+		// 设置消息处理器的基本信息
+		t.Base().To = req.To
+		t.Base().Subject = subject
+		t.Base().Content = content
+		t.Base().Priority = req.Priority
+		t.Base().TemplateID = req.TemplateID
+		t.Base().TemplateData = req.TemplateData
+
+		log.InfoContextf(ctx, "📧 准备发送消息，Channel: %d, To: %s, Subject: %s, Content: %s",
+			channel, req.To, subject, content)
+
+		// 发送消息
+		err = t.SendMsg()
+		if err != nil {
+			log.ErrorContextf(ctx, "❌ 渠道 %d 发送消息失败: %s", channel, err.Error())
+			lastErr = err
+			continue
+		}
+		log.InfoContextf(ctx, "✅ 渠道 %d 发送消息成功", channel)
+		successCount++
 	}
-	log.InfoContextf(ctx, "✅ 找到消息处理器，Channel: %d", tp.Channel)
 
-	// 创建消息处理器实例
-	t := handler.NewProc()
-	// 设置消息处理器的基本信息
-	t.Base().To = req.To
-	t.Base().Subject = tp.Subject
-	t.Base().Content = content
-	t.Base().Priority = req.Priority
-	t.Base().TemplateID = req.TemplateID
-	t.Base().TemplateData = req.TemplateData
-
-	log.InfoContextf(ctx, "📧 准备发送消息，To: %s, Subject: %s, Content: %s", req.To, tp.Subject, content)
-
-	// 发送消息
-	err = t.SendMsg()
-	if err != nil {
-		log.ErrorContextf(ctx, "❌ 发送消息失败: %s", err.Error())
-		return err
+	// 如果所有渠道都失败，返回错误
+	if successCount == 0 {
+		log.ErrorContextf(ctx, "❌ 所有渠道发送失败")
+		return lastErr
 	}
+
 	// 使用通用函数创建或更新消息记录
 	// 如果记录存在则更新状态，如果不存在则创建新记录
 	err = tools.CreateOrUpdateMsgRecord(dt.GetDB(), req.MsgID, req, tp, int(data.MSG_STATUS_SUCC))

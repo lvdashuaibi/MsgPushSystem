@@ -14,6 +14,14 @@
         label-width="120px"
         class="send-form"
       >
+        <!-- 消息类型选择 -->
+        <el-form-item label="消息类型" required>
+          <el-radio-group v-model="messageType" @change="handleMessageTypeChange">
+            <el-radio label="template">使用模板</el-radio>
+            <el-radio label="direct">直接编写</el-radio>
+          </el-radio-group>
+        </el-form-item>
+
         <!-- 接收者类型选择 -->
         <el-form-item label="接收者类型" required>
           <el-radio-group v-model="receiverType" @change="handleReceiverTypeChange">
@@ -115,43 +123,93 @@
           </div>
         </el-form-item>
 
-        <el-form-item label="消息模板" prop="templateID" required>
-          <el-select
-            v-model="form.templateID"
-            placeholder="请选择消息模板"
-            style="width: 400px"
-            @change="handleTemplateChange"
-          >
-            <el-option
-              v-for="template in templates"
-              :key="template.relTemplateID"
-              :label="template.name"
-              :value="template.relTemplateID"
+        <!-- 使用模板模式 -->
+        <template v-if="messageType === 'template'">
+          <el-form-item label="消息模板" prop="templateID" required>
+            <el-select
+              v-model="form.templateID"
+              placeholder="请选择消息模板"
+              style="width: 400px"
+              @change="handleTemplateChange"
             >
-              <div>
-                <span>{{ template.name }}</span>
-                <span style="color: #8492a6; font-size: 12px; margin-left: 8px">
-                  {{ template.subject }}
-                </span>
-              </div>
-            </el-option>
-          </el-select>
-          <el-button
-            type="text"
-            @click="loadTemplates"
-            style="margin-left: 8px"
-          >
-            刷新
-          </el-button>
-        </el-form-item>
+              <el-option
+                v-for="template in templates"
+                :key="template.relTemplateID"
+                :label="template.name"
+                :value="template.relTemplateID"
+              >
+                <div>
+                  <span>{{ template.name }}</span>
+                  <span style="color: #8492a6; font-size: 12px; margin-left: 8px">
+                    {{ template.subject }}
+                  </span>
+                </div>
+              </el-option>
+            </el-select>
+            <el-button
+              type="text"
+              @click="loadTemplates"
+              style="margin-left: 8px"
+            >
+              刷新
+            </el-button>
+          </el-form-item>
 
-        <el-form-item label="消息主题" prop="subject">
-          <el-input
-            v-model="form.subject"
-            placeholder="消息主题（可选）"
-            style="width: 400px"
-          />
-        </el-form-item>
+          <el-form-item label="消息主题" prop="subject">
+            <el-input
+              v-model="form.subject"
+              placeholder="消息主题（可选）"
+              style="width: 400px"
+            />
+          </el-form-item>
+        </template>
+
+        <!-- 直接编写模式 -->
+        <template v-if="messageType === 'direct'">
+          <el-form-item label="消息渠道" prop="channels" required>
+            <el-select
+              v-model="form.channels"
+              placeholder="选择消息渠道（支持多选）"
+              multiple
+              style="width: 100%; max-width: 400px"
+            >
+              <el-option label="邮件" :value="1" />
+              <el-option label="短信" :value="2" />
+              <el-option label="飞书" :value="3" />
+              <el-option label="微信" :value="4" />
+              <el-option label="钉钉" :value="5" />
+            </el-select>
+            <div v-if="form.channels && form.channels.length > 0" class="selected-channels" style="margin-top: 8px">
+              <el-tag
+                v-for="channel in form.channels"
+                :key="channel"
+                closable
+                @close="removeChannel(channel)"
+                style="margin-right: 8px"
+              >
+                {{ getChannelText(channel) }}
+              </el-tag>
+            </div>
+          </el-form-item>
+
+          <el-form-item label="消息主题" prop="subject">
+            <el-input
+              v-model="form.subject"
+              placeholder="消息主题"
+              style="width: 400px"
+            />
+          </el-form-item>
+
+          <el-form-item label="消息内容" prop="content" required>
+            <el-input
+              v-model="form.content"
+              type="textarea"
+              placeholder="请输入消息内容"
+              :rows="6"
+              style="width: 100%; max-width: 600px"
+            />
+          </el-form-item>
+        </template>
 
         <el-form-item label="优先级" prop="priority">
           <el-select v-model="form.priority" placeholder="选择优先级" style="width: 200px">
@@ -162,8 +220,8 @@
           </el-select>
         </el-form-item>
 
-        <!-- 模板预览 -->
-        <el-form-item v-if="selectedTemplate" label="模板预览">
+        <!-- 模板预览（仅在使用模板模式显示） -->
+        <el-form-item v-if="messageType === 'template' && selectedTemplate" label="模板预览">
           <el-card class="template-preview">
             <div class="template-info">
               <p><strong>模板名称：</strong>{{ selectedTemplate.name }}</p>
@@ -175,8 +233,8 @@
           </el-card>
         </el-form-item>
 
-        <!-- 模板数据 -->
-        <el-form-item v-if="templateVariables.length > 0" label="模板数据" required>
+        <!-- 模板数据（仅在使用模板模式显示） -->
+        <el-form-item v-if="messageType === 'template' && templateVariables.length > 0" label="模板数据" required>
           <div class="template-data">
             <div
               v-for="variable in templateVariables"
@@ -273,11 +331,14 @@ import type { SendMsgReq, Template, CreateScheduledMessageReq, User, TagStatisti
 // 表单引用
 const formRef = ref<FormInstance>()
 
+// 消息类型
+const messageType = ref<'template' | 'direct'>('template')
+
 // 接收者类型
 const receiverType = ref<'direct' | 'users' | 'tags'>('direct')
 
 // 表单数据
-const form = reactive<SendMsgReq & { subject?: string; priority?: number }>({
+const form = reactive<SendMsgReq & { subject?: string; priority?: number; channels?: number[]; content?: string }>({
   to: '',
   user_ids: [],
   tags: [],
@@ -285,6 +346,8 @@ const form = reactive<SendMsgReq & { subject?: string; priority?: number }>({
   priority: 2,
   templateID: '',
   templateData: {},
+  channels: [],
+  content: '',
   sendTimestamp: undefined
 })
 
@@ -326,7 +389,42 @@ const rules: FormRules = {
       trigger: 'change'
     }
   ],
-  templateID: [{ required: true, message: '请选择消息模板', trigger: 'change' }]
+  templateID: [
+    {
+      validator: (rule, value, callback) => {
+        if (messageType.value === 'template' && !value) {
+          callback(new Error('请选择消息模板'))
+        } else {
+          callback()
+        }
+      },
+      trigger: 'change'
+    }
+  ],
+  channels: [
+    {
+      validator: (rule, value, callback) => {
+        if (messageType.value === 'direct' && (!value || value.length === 0)) {
+          callback(new Error('请选择消息渠道'))
+        } else {
+          callback()
+        }
+      },
+      trigger: 'change'
+    }
+  ],
+  content: [
+    {
+      validator: (rule, value, callback) => {
+        if (messageType.value === 'direct' && !value?.trim()) {
+          callback(new Error('请输入消息内容'))
+        } else {
+          callback()
+        }
+      },
+      trigger: 'blur'
+    }
+  ]
 }
 
 // 状态
@@ -386,11 +484,32 @@ const getUserDisplayName = (userId: string) => {
   return user ? `${user.name} (${user.user_id})` : userId
 }
 
+// 消息类型变化处理
+const handleMessageTypeChange = () => {
+  // 清空模板相关数据
+  form.templateID = ''
+  form.templateData = {}
+  selectedTemplate.value = undefined
+  templateVariables.value = []
+
+  // 清空直接编写相关数据
+  form.content = ''
+  form.channels = []
+}
+
 // 接收者类型变化处理
 const handleReceiverTypeChange = () => {
   form.to = ''
   form.user_ids = []
   form.tags = []
+}
+
+// 移除渠道
+const removeChannel = (channel: number) => {
+  const index = form.channels!.indexOf(channel)
+  if (index > -1) {
+    form.channels!.splice(index, 1)
+  }
 }
 
 // 搜索用户
@@ -522,8 +641,8 @@ const handleSend = async () => {
   try {
     await formRef.value.validate()
 
-    // 验证模板数据
-    if (templateVariables.value.length > 0) {
+    // 验证模板数据（仅在使用模板模式）
+    if (messageType.value === 'template' && templateVariables.value.length > 0) {
       const missingVariables = templateVariables.value.filter(
         variable => !form.templateData[variable]?.trim()
       )
@@ -537,11 +656,20 @@ const handleSend = async () => {
 
     if (sendTimeType.value === 'now') {
       // 立即发送
-      const sendData: SendMsgReq = {
-        templateID: form.templateID,
-        templateData: form.templateData,
-        subject: form.subject,
+      let sendData: any = {
         priority: form.priority
+      }
+
+      if (messageType.value === 'template') {
+        // 使用模板模式
+        sendData.templateID = form.templateID
+        sendData.templateData = form.templateData
+        sendData.subject = form.subject
+      } else {
+        // 直接编写模式
+        sendData.channels = form.channels
+        sendData.subject = form.subject
+        sendData.content = form.content
       }
 
       // 根据接收者类型设置相应字段
@@ -567,10 +695,19 @@ const handleSend = async () => {
         return
       }
 
-      const scheduledData: CreateScheduledMessageReq = {
-        template_id: form.templateID,
-        template_data: form.templateData,
+      let scheduledData: any = {
         scheduled_time: scheduledTime.value
+      }
+
+      if (messageType.value === 'template') {
+        // 使用模板模式
+        scheduledData.template_id = form.templateID
+        scheduledData.template_data = form.templateData
+      } else {
+        // 直接编写模式
+        scheduledData.channels = form.channels
+        scheduledData.subject = form.subject
+        scheduledData.content = form.content
       }
 
       // 根据接收者类型设置相应字段
@@ -612,13 +749,16 @@ const resetForm = () => {
     subject: '',
     priority: 2,
     templateID: '',
-    templateData: {}
+    templateData: {},
+    channels: [],
+    content: ''
   })
   selectedTemplate.value = undefined
   templateVariables.value = []
   sendTimeType.value = 'now'
   scheduledTime.value = undefined
   receiverType.value = 'direct'
+  messageType.value = 'template'
 }
 
 // 加载标签统计
@@ -742,5 +882,11 @@ onMounted(() => {
 .variable-item {
   display: flex;
   align-items: center;
+}
+
+.selected-channels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 </style>

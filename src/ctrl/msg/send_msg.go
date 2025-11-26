@@ -57,17 +57,27 @@ func SendMsg(c *gin.Context) {
 
 // HandleInput 参数检查
 func (p *SendMsgHandler) HandleInput() error {
-	if p.Req.TemplateID == "" {
-		p.Resp.Code = constant.ERR_INPUT_INVALID
-		return nil
-	}
-	if p.Req.TemplateData == nil {
+	// 验证至少有一种接收者类型
+	if p.Req.To == "" && len(p.Req.UserIDs) == 0 && len(p.Req.Tags) == 0 {
 		p.Resp.Code = constant.ERR_INPUT_INVALID
 		return nil
 	}
 
-	// 验证至少有一种接收者类型
-	if p.Req.To == "" && len(p.Req.UserIDs) == 0 && len(p.Req.Tags) == 0 {
+	// 判断是模板模式还是直接编写模式
+	if p.Req.TemplateID != "" {
+		// 模板模式：需要模板ID和模板数据
+		if p.Req.TemplateData == nil {
+			p.Resp.Code = constant.ERR_INPUT_INVALID
+			return nil
+		}
+	} else if p.Req.Content != "" {
+		// 直接编写模式：需要渠道列表和内容
+		if len(p.Req.Channels) == 0 {
+			p.Resp.Code = constant.ERR_INPUT_INVALID
+			return nil
+		}
+	} else {
+		// 既没有模板ID也没有内容
 		p.Resp.Code = constant.ERR_INPUT_INVALID
 		return nil
 	}
@@ -85,18 +95,23 @@ func (p *SendMsgHandler) HandleProcess() error {
 	log.Infof("into HandleProcess")
 	dt := data.GetData()
 
-	// 获取消息模板
-	mt, err := dt.GetMsgTemplate(ctx, p.Req.TemplateID)
-	if err != nil {
-		log.Errorf("get msg template err %s", err.Error())
-		p.Resp.Code = constant.ERR_TEMPLATE_NOT_READY
-		return err
-	}
+	var mt *data.MsgTemplate
 
-	// 模板状态检查
-	if mt.Status != int(data.TEMPLATE_STATUS_NORMAL) {
-		p.Resp.Code = constant.ERR_TEMPLATE_NOT_READY
-		return errors.New("template not ready")
+	// 如果是模板模式，获取模板信息
+	if p.Req.TemplateID != "" {
+		var err error
+		mt, err = dt.GetMsgTemplate(ctx, p.Req.TemplateID)
+		if err != nil {
+			log.Errorf("get msg template err %s", err.Error())
+			p.Resp.Code = constant.ERR_TEMPLATE_NOT_READY
+			return err
+		}
+
+		// 模板状态检查
+		if mt.Status != int(data.TEMPLATE_STATUS_NORMAL) {
+			p.Resp.Code = constant.ERR_TEMPLATE_NOT_READY
+			return errors.New("template not ready")
+		}
 	}
 
 	// 解析接收者列表
@@ -189,19 +204,28 @@ func (p *SendMsgHandler) parseRecipients() ([]string, error) {
 	return recipients, nil
 }
 
-// getRecipientByChannel 根据模板渠道获取用户的联系方式
+// getRecipientByChannel 根据模板渠道或直接发送渠道获取用户的联系方式
 func (p *SendMsgHandler) getRecipientByChannel(user *data.User) string {
 	ctx := context.Background()
 	dt := data.GetData()
 
-	// 获取模板信息以确定渠道
-	mt, err := dt.GetMsgTemplate(ctx, p.Req.TemplateID)
-	if err != nil {
-		log.Errorf("get template failed: %s", err.Error())
-		return ""
+	var channel int
+
+	// 判断是模板模式还是直接发送模式
+	if p.Req.TemplateID != "" {
+		// 模板模式：从模板获取渠道
+		mt, err := dt.GetMsgTemplate(ctx, p.Req.TemplateID)
+		if err != nil {
+			log.Errorf("get template failed: %s", err.Error())
+			return ""
+		}
+		channel = mt.Channel
+	} else if len(p.Req.Channels) > 0 {
+		// 直接发送模式：使用第一个渠道
+		channel = p.Req.Channels[0]
 	}
 
-	switch mt.Channel {
+	switch channel {
 	case 1: // 邮件
 		return user.Email
 	case 2: // 短信
@@ -244,9 +268,26 @@ func (p *SendMsgHandler) sendSingleMessage(msgReq *ctrlmodel.SendMsgReq, mt *dat
 	var (
 		limit, div int
 		ready      bool
+		channel    int
 	)
 
-	quatoCacheKey := fmt.Sprintf("%s%s%d", data.REDIS_KEY_SOURCE_QUOTA, mt.SourceID, mt.Channel)
+	// 确定渠道：模板模式或直接发送模式
+	if mt != nil {
+		channel = mt.Channel
+	} else if len(msgReq.Channels) > 0 {
+		channel = msgReq.Channels[0]
+	} else {
+		return "", errors.New("no channel specified")
+	}
+
+	// 构建配额缓存key
+	var templateSourceID string
+	if mt != nil {
+		templateSourceID = mt.SourceID
+	} else {
+		templateSourceID = sourceID
+	}
+	quatoCacheKey := fmt.Sprintf("%s%s%d", data.REDIS_KEY_SOURCE_QUOTA, templateSourceID, channel)
 
 	// 如果缓存开启，则从缓存中获取配额
 	if config.Conf.Common.OpenCache {
@@ -264,14 +305,14 @@ func (p *SendMsgHandler) sendSingleMessage(msgReq *ctrlmodel.SendMsgReq, mt *dat
 	if !ready {
 		log.Infof("quota cache miss")
 		// 获取全局配额
-		globalQuota, err := data.GlobalQuotaNsp.Find(dt.GetDB(), mt.Channel)
+		globalQuota, err := data.GlobalQuotaNsp.Find(dt.GetDB(), channel)
 		if err != nil {
 			return "", err
 		}
 		limit = globalQuota.Num
 		div = globalQuota.Unit
 		// 获取业务配额
-		sourceQuota, err := data.SourceQuotaNsp.Find(dt.GetDB(), sourceID, mt.Channel)
+		sourceQuota, err := data.SourceQuotaNsp.Find(dt.GetDB(), sourceID, channel)
 		if err != nil {
 			if err != gorm.ErrRecordNotFound {
 				return "", err
@@ -289,10 +330,10 @@ func (p *SendMsgHandler) sendSingleMessage(msgReq *ctrlmodel.SendMsgReq, mt *dat
 
 	// 创建限流器
 	lm := tools.NewRateLimiter(dt.GetCache().GetRedisBaseConn(), div, limit)
-	keyID := fmt.Sprintf(data.REDIS_KEY_RATE_LIMIT_COUNT+":%s:%d", sourceID, mt.Channel)
+	keyID := fmt.Sprintf(data.REDIS_KEY_RATE_LIMIT_COUNT+":%s:%d", sourceID, channel)
 	if msgReq.SendTimestamp > 0 {
 		// 定时消息单独计数限频
-		keyID = fmt.Sprintf(data.REDIS_KEY_RATE_LIMIT_COUNT_TIMER+":%s:%d", sourceID, mt.Channel)
+		keyID = fmt.Sprintf(data.REDIS_KEY_RATE_LIMIT_COUNT_TIMER+":%s:%d", sourceID, channel)
 	}
 
 	// 判断用户的请求是否被允许
