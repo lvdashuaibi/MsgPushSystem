@@ -48,6 +48,11 @@
             <el-menu-item index="/scheduled/list">定时列表</el-menu-item>
             <el-menu-item index="/scheduled/create">创建定时消息</el-menu-item>
           </el-sub-menu>
+
+          <el-menu-item index="/ai-polish">
+            <el-icon><MagicStick /></el-icon>
+            <span>AI内容润色</span>
+          </el-menu-item>
         </el-menu>
       </el-aside>
 
@@ -83,7 +88,8 @@ import {
   Odometer,
   ChatDotRound,
   User,
-  Timer
+  Timer,
+  MagicStick
 } from '@element-plus/icons-vue'
 
 const router = useRouter()
@@ -122,6 +128,8 @@ const breadcrumbs = computed(() => {
     } else if (path === '/scheduled/list') {
       breadcrumbs.push({ path: '/scheduled/list', title: '定时列表' })
     }
+  } else if (path.startsWith('/ai-polish')) {
+    breadcrumbs.push({ path: '/ai-polish', title: 'AI内容润色' })
   }
 
   return breadcrumbs

@@ -1,14 +1,15 @@
 package initialize
 
 import (
+	"github.com/gin-gonic/gin"
+	"github.com/lvdashuaibi/MsgPushSystem/src/ctrl/handler"
 	"github.com/lvdashuaibi/MsgPushSystem/src/ctrl/msg"
 	"github.com/lvdashuaibi/MsgPushSystem/src/ctrl/scheduled"
 	"github.com/lvdashuaibi/MsgPushSystem/src/ctrl/user"
-	"github.com/gin-gonic/gin"
 )
 
 // RegisterRouter 注册路由
-func RegisterRouter(router *gin.Engine) {
+func RegisterRouter(router *gin.Engine, aiHandler *handler.AIPolishHandler) {
 	{
 		// 消息相关接口
 		router.POST("/msg/send_msg", msg.SendMsg)
@@ -34,5 +35,11 @@ func RegisterRouter(router *gin.Engine) {
 		router.GET("/scheduled/get", scheduled.GetScheduledMessage)
 		router.GET("/scheduled/list", scheduled.ListScheduledMessages)
 		router.POST("/scheduled/cancel", scheduled.CancelScheduledMessage)
+
+		// AI润色接口
+		router.POST("/ai/polish/all", aiHandler.PolishForAllChannels)
+		router.POST("/ai/polish/single", aiHandler.PolishForSingleChannel)
+		router.GET("/ai/polish/stream", aiHandler.PolishForSingleChannelStream)
+		router.POST("/ai/polish/optimize", aiHandler.OptimizeContent)
 	}
 }

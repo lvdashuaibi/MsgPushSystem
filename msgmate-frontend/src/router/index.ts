@@ -95,6 +95,19 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '创建定时消息' }
       }
     ]
+  },
+  {
+    path: '/ai-polish',
+    component: () => import('@/layouts/MainLayout.vue'),
+    meta: { title: 'AI润色' },
+    children: [
+      {
+        path: '',
+        name: 'AIPolish',
+        component: () => import('@/views/AIPolish/index.vue'),
+        meta: { title: 'AI内容润色' }
+      }
+    ]
   }
 ]
 

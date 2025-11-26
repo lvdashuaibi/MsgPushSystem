@@ -9,9 +9,12 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/lvdashuaibi/MsgPushSystem/src/config"
 	"github.com/lvdashuaibi/MsgPushSystem/src/ctrl/consumer"
+	"github.com/lvdashuaibi/MsgPushSystem/src/ctrl/handler"
 	"github.com/lvdashuaibi/MsgPushSystem/src/data"
 	"github.com/lvdashuaibi/MsgPushSystem/src/initialize"
+	"github.com/lvdashuaibi/MsgPushSystem/src/pkg/ai"
 	"github.com/lvdashuaibi/MsgPushSystem/src/pkg/log"
+	"github.com/sirupsen/logrus"
 )
 
 func main() {
@@ -44,8 +47,15 @@ func main() {
 		c.Next()
 	})
 
+	// 初始化AI客户端和润色器
+	logger := logrus.New()
+	logger.SetLevel(logrus.InfoLevel)
+	aiClient := ai.NewGPTUtilsClient(logger)
+	polisher := ai.NewContentPolisher(aiClient, logger)
+	aiHandler := handler.NewAIPolishHandler(polisher)
+
 	// 这里跳进去就能看到有哪些接口
-	initialize.RegisterRouter(router)
+	initialize.RegisterRouter(router, aiHandler)
 	fmt.Println("before router run")
 	// 启动web server，这一步之后这个主协程启动会阻塞在这里，请求可以通过gin的子协程进来
 	err = router.Run(fmt.Sprintf(":%d", config.Conf.Common.Port))
