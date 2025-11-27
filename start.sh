@@ -54,6 +54,7 @@ show_help() {
     echo "                            docker  - 仅启动Docker组件"
     echo "                            backend - 仅启动后端服务"
     echo "                            frontend - 仅启动前端服务"
+    echo "                            restart - 重启后端服务"
     echo "  -d, --detach           后台运行模式"
     echo "  --no-build             跳过构建步骤"
     echo "  --clean                清理并重新启动"
@@ -62,6 +63,7 @@ show_help() {
     echo "  $0                      # 启动所有服务，使用docker配置"
     echo "  $0 -c local -m backend  # 使用local配置启动后端"
     echo "  $0 -m docker            # 仅启动Docker组件"
+    echo "  $0 -m restart           # 重启后端服务"
     echo "  $0 --clean              # 清理并重新启动所有服务"
 }
 
@@ -307,6 +309,98 @@ start_backend() {
     log_success "后端服务启动完成"
 }
 
+# 重启后端
+restart_backend() {
+    if [ "$SKIP_BACKEND" = true ]; then
+        log_warn "跳过后端重启（Go未安装）"
+        return
+    fi
+
+    log_step "重启后端服务..."
+
+    cd "$PROJECT_ROOT"
+
+    # 检查配置文件
+    local config_file="./config/config-${CONFIG}.toml"
+    if [ ! -f "$config_file" ]; then
+        log_error "配置文件不存在: $config_file"
+        exit 1
+    fi
+
+    log_info "使用配置: $CONFIG"
+
+    # 停止旧的后端进程
+    if [ -f "log/backend.pid" ]; then
+        local old_pid=$(cat log/backend.pid)
+        if kill -0 "$old_pid" 2>/dev/null; then
+            log_info "停止旧的后端进程 (PID: $old_pid)..."
+            kill "$old_pid" 2>/dev/null || true
+            sleep 2
+            if kill -0 "$old_pid" 2>/dev/null; then
+                log_warn "进程未正常退出，强制杀死..."
+                kill -9 "$old_pid" 2>/dev/null || true
+            fi
+            log_success "旧进程已停止"
+        else
+            log_info "旧进程不存在或已停止"
+        fi
+    fi
+
+    # 等待端口释放
+    log_info "等待端口释放..."
+    local retry_count=0
+    while lsof -ti:8109 &> /dev/null; do
+        if [ $retry_count -ge 10 ]; then
+            log_warn "端口仍被占用，强制清理..."
+            lsof -ti:8109 | xargs kill -9 2>/dev/null || true
+            sleep 2
+            break
+        fi
+        echo -n "."
+        sleep 1
+        ((retry_count++))
+    done
+    echo ""
+
+    # 重新编译后端
+    if [ "$NO_BUILD" != true ]; then
+        log_info "重新编译后端..."
+        go build -o bin/main src/main.go
+        log_success "后端编译完成"
+    fi
+
+    # 启动新的后端进程
+    log_info "启动新的后端进程..."
+    log_info "后端服务将在 http://localhost:8109 启动"
+
+    if [ "$DETACH_MODE" = true ]; then
+        nohup ./bin/main --config="$config_file" > log/backend.log 2>&1 &
+        echo $! > log/backend.pid
+        log_info "后端服务已在后台启动，PID: $(cat log/backend.pid)"
+    else
+        ./bin/main --config="$config_file" &
+        BACKEND_PID=$!
+        echo $BACKEND_PID > log/backend.pid
+    fi
+
+    # 等待后端启动
+    log_info "等待后端服务启动..."
+    local retry_count=0
+    while ! curl -s http://localhost:8109/user/tag_statistics > /dev/null 2>&1; do
+        if [ $retry_count -ge 30 ]; then
+            log_error "后端服务启动超时"
+            log_error "请查看日志: tail -f log/backend.log"
+            exit 1
+        fi
+        echo -n "."
+        sleep 2
+        ((retry_count++))
+    done
+    echo ""
+
+    log_success "后端服务重启完成"
+}
+
 # 安装前端依赖
 install_frontend_deps() {
     if [ "$SKIP_FRONTEND" = true ] || [ "$NO_BUILD" = true ]; then
@@ -469,7 +563,7 @@ main() {
         exit 1
     fi
 
-    if [[ ! "$MODE" =~ ^(all|docker|backend|frontend)$ ]]; then
+    if [[ ! "$MODE" =~ ^(all|docker|backend|frontend|restart)$ ]]; then
         log_error "无效的模式: $MODE"
         exit 1
     fi
@@ -494,6 +588,18 @@ main() {
 
     # 执行启动流程
     check_dependencies
+
+    # 处理restart模式
+    if [ "$MODE" = "restart" ]; then
+        restart_backend
+        show_status
+        # 如果不是后台模式，等待用户中断
+        if [ "$DETACH_MODE" != true ]; then
+            log_info "按 Ctrl+C 停止所有服务"
+            wait
+        fi
+        return
+    fi
 
     if [ "$MODE" = "all" ] || [ "$MODE" = "docker" ]; then
         check_ports

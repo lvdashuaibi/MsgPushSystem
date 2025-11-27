@@ -121,7 +121,7 @@
 
           <!-- 单渠道结果 -->
           <div v-if="result && form.channel !== 0" class="single-channel-result">
-            <content-display :content="result" :is-streaming="loading" />
+            <content-display :content="result" :is-streaming="loading" :key="result.content" />
           </div>
         </el-card>
       </el-col>
@@ -230,50 +230,73 @@ const handleStreamPolish = () => {
   }
   result.value = tempResult
 
-  const eventSource = new EventSource(
-    `/api/ai/polish/stream?original_intent=${encodeURIComponent(form.originalIntent)}&channel=${form.channel}`,
-    { withCredentials: false }
-  )
+  const url = `/api/ai/polish/stream?original_intent=${encodeURIComponent(form.originalIntent)}&channel=${form.channel}`
+  console.log('开始流式请求:', url)
+
+  const eventSource = new EventSource(url)
+  let isCompleted = false
+
+  eventSource.onopen = () => {
+    console.log('SSE连接已建立')
+  }
 
   eventSource.onmessage = (event) => {
     try {
+      console.log('收到SSE消息:', event.data)
       const data = JSON.parse(event.data)
 
       switch (data.event) {
         case 'start':
           console.log('开始生成:', data.data)
+          tempResult.subject = data.data.message || '正在生成...'
+          // 强制更新，触发组件重新渲染
+          result.value = JSON.parse(JSON.stringify(tempResult))
           break
 
         case 'chunk':
           // 实时更新内容
-          tempResult.content = data.data.total || data.data.content
-          result.value = { ...tempResult }
+          console.log('收到chunk:', data.data.content)
+          tempResult.content = data.data.total || ''
+          // 每次chunk都强制更新，确保UI实时显示
+          result.value = JSON.parse(JSON.stringify(tempResult))
           break
 
         case 'complete':
           // 生成完成
+          console.log('生成完成:', data.data)
           result.value = data.data
+          isCompleted = true
           ElMessage.success('内容润色成功！')
           eventSource.close()
           loading.value = false
           break
 
         case 'error':
+          console.error('生成错误:', data.data)
+          isCompleted = true
           ElMessage.error(data.data.message || '生成失败')
           eventSource.close()
           loading.value = false
           break
       }
     } catch (error) {
-      console.error('解析SSE数据失败:', error)
+      console.error('解析SSE数据失败:', error, '原始数据:', event.data)
     }
   }
 
   eventSource.onerror = (error) => {
     console.error('SSE连接错误:', error)
-    ElMessage.error('连接中断，请重试')
+    if (eventSource.readyState === EventSource.CLOSED) {
+      console.log('SSE连接已关闭')
+      // 如果连接关闭但还没有收到complete事件，说明出错了
+      if (!isCompleted) {
+        loading.value = false
+      }
+    } else {
+      ElMessage.error('连接中断，请重试')
+      loading.value = false
+    }
     eventSource.close()
-    loading.value = false
   }
 }
 

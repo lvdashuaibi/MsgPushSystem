@@ -33,16 +33,30 @@
       <div v-if="content.format === 'html'" class="html-preview">
         <el-tabs v-model="activeTab">
           <el-tab-pane label="预览" name="preview">
-            <div class="preview-container" v-html="content.content"></div>
+            <div class="preview-container">
+              <div v-if="isStreaming" class="streaming-indicator">
+                <el-icon class="is-loading"><Loading /></el-icon>
+                <span>正在生成内容...</span>
+              </div>
+              <iframe
+                :key="content.content"
+                :srcDoc="getIframeSrcDoc(content.content)"
+                class="html-iframe"
+                frameborder="0"
+                scrolling="auto"
+              ></iframe>
+            </div>
           </el-tab-pane>
           <el-tab-pane label="源代码" name="source">
-            <el-input
-              v-model="content.content"
-              type="textarea"
-              :rows="15"
-              readonly
-              class="code-textarea"
-            />
+            <div class="source-code-container">
+              <el-input
+                v-model="content.content"
+                type="textarea"
+                :rows="15"
+                readonly
+                class="code-textarea"
+              />
+            </div>
           </el-tab-pane>
         </el-tabs>
       </div>
@@ -83,7 +97,7 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { ElMessage } from 'element-plus'
-import { DocumentCopy, Download } from '@element-plus/icons-vue'
+import { DocumentCopy, Download, Loading } from '@element-plus/icons-vue'
 
 const props = defineProps({
   content: {
@@ -147,6 +161,89 @@ const downloadContent = () => {
 
   ElMessage.success('文件已下载')
 }
+
+// 生成iframe的srcDoc内容
+const getIframeSrcDoc = (htmlContent) => {
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <style>
+        body {
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+          line-height: 1.6;
+          color: #333;
+          margin: 0;
+          padding: 20px;
+          background-color: #f5f5f5;
+        }
+        h1, h2, h3, h4, h5, h6 {
+          color: #303133;
+          margin-top: 16px;
+          margin-bottom: 8px;
+        }
+        p {
+          margin: 8px 0;
+          line-height: 1.8;
+        }
+        strong {
+          color: #303133;
+          font-weight: 600;
+        }
+        ul, ol {
+          margin: 8px 0;
+          padding-left: 24px;
+        }
+        li {
+          margin: 4px 0;
+        }
+        a {
+          color: #409EFF;
+          text-decoration: none;
+        }
+        a:hover {
+          text-decoration: underline;
+        }
+        table {
+          border-collapse: collapse;
+          width: 100%;
+          margin: 16px 0;
+        }
+        table th, table td {
+          border: 1px solid #ddd;
+          padding: 8px;
+          text-align: left;
+        }
+        table th {
+          background-color: #f5f5f5;
+          font-weight: 600;
+        }
+        code {
+          background-color: #f5f5f5;
+          padding: 2px 6px;
+          border-radius: 3px;
+          font-family: 'Courier New', monospace;
+        }
+        pre {
+          background-color: #f5f5f5;
+          padding: 12px;
+          border-radius: 4px;
+          overflow-x: auto;
+        }
+        pre code {
+          background-color: transparent;
+          padding: 0;
+        }
+      </style>
+    </head>
+    <body>
+      ${htmlContent}
+    </body>
+    </html>
+  `
+}
 </script>
 
 <style scoped>
@@ -178,9 +275,103 @@ const downloadContent = () => {
 .preview-container {
   border: 1px solid #DCDFE6;
   border-radius: 4px;
-  padding: 20px;
+  padding: 0;
   background-color: #FFFFFF;
-  min-height: 300px;
+  min-height: 400px;
+  position: relative;
+  overflow: hidden;
+}
+
+.html-iframe {
+  width: 100%;
+  height: 400px;
+  border: none;
+  border-radius: 4px;
+}
+
+.streaming-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  background-color: #E6F7FF;
+  border-left: 4px solid #1890FF;
+  border-radius: 4px;
+  margin-bottom: 16px;
+  color: #1890FF;
+  font-size: 14px;
+}
+
+.streaming-indicator .is-loading {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.html-content {
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+.html-content h1,
+.html-content h2,
+.html-content h3,
+.html-content h4,
+.html-content h5,
+.html-content h6 {
+  margin-top: 16px;
+  margin-bottom: 8px;
+  color: #303133;
+}
+
+.html-content p {
+  margin: 8px 0;
+  line-height: 1.6;
+  color: #606266;
+}
+
+.html-content strong {
+  color: #303133;
+  font-weight: 600;
+}
+
+.html-content ul,
+.html-content ol {
+  margin: 8px 0;
+  padding-left: 24px;
+}
+
+.html-content li {
+  margin: 4px 0;
+  color: #606266;
+}
+
+.source-code-container {
+  width: 100%;
+}
+
+.code-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid #DCDFE6;
+}
+
+.html-preview-popover {
+  max-height: 600px;
+  overflow-y: auto;
+  padding: 16px;
+  background-color: #FFFFFF;
+  border-radius: 4px;
 }
 
 .code-textarea, .text-textarea {

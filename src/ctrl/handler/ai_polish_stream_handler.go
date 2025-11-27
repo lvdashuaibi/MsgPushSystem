@@ -203,11 +203,17 @@ func sendSSE(w gin.ResponseWriter, event string, data interface{}) {
 
 // buildEmailPrompt 构建邮件提示词
 func buildEmailPrompt(originalIntent string) string {
-	return fmt.Sprintf(`请将以下原始意图转换为专业的邮件内容：
+	return fmt.Sprintf(`你是一个专业的邮件内容润色助手。你的任务是将用户提供的原始意图转换为专业的邮件内容。
+
+【核心原则】
+1. 严格遵循原始意图，只进行润色和格式化，不能添加、删除或改变原意
+2. 不能编造与原文无关的内容
+3. 不能添加虚假信息或假设
+4. 只能基于原始意图中已有的信息进行扩展和优化
 
 原始意图：%s
 
-要求：
+【具体要求】
 1. 生成完整的HTML格式邮件内容
 2. 包含适当的标题（使用<h2>标签）
 3. 正文分段清晰，使用<p>标签
@@ -215,6 +221,14 @@ func buildEmailPrompt(originalIntent string) string {
 5. 语气正式、专业、详尽
 6. 包含适当的问候语和落款
 7. 使用合适的HTML样式，使邮件美观易读
+8. 【严格要求】不能出现"XXX"、"某某"、"[待填写]"等占位符，所有内容必须具体明确
+9. 【严格要求】不能添加原始意图中没有的信息，只能对已有信息进行润色
+
+【禁止事项】
+- 不能添加虚假的日期、时间、地点等信息
+- 不能添加虚假的人名、部门名称等
+- 不能添加原文中没有提及的细节
+- 不能改变原文的核心意思
 
 请按以下JSON格式返回：
 {
@@ -228,11 +242,17 @@ func buildEmailPrompt(originalIntent string) string {
 
 // buildSMSPrompt 构建短信提示词
 func buildSMSPrompt(originalIntent string) string {
-	return fmt.Sprintf(`请将以下原始意图转换为简洁的短信内容：
+	return fmt.Sprintf(`你是一个专业的短信内容润色助手。你的任务是将用户提供的原始意图转换为简洁的短信内容。
+
+【核心原则】
+1. 严格遵循原始意图，只进行润色和格式化，不能添加、删除或改变原意
+2. 不能编造与原文无关的内容
+3. 不能添加虚假信息或假设
+4. 只能基于原始意图中已有的信息进行优化
 
 原始意图：%s
 
-要求：
+【具体要求】
 1. 纯文本格式，不使用HTML或Markdown
 2. 以【MsgMate】开头作为签名
 3. 字数控制在70字以内
@@ -241,6 +261,14 @@ func buildSMSPrompt(originalIntent string) string {
 6. 使用温馨、友好的语气
 7. 重要数字和时间使用阿拉伯数字
 8. 适当使用标点符号分隔信息
+9. 【严格要求】不能出现"XXX"、"某某"、"[待填写]"等占位符，所有内容必须具体明确
+10. 【严格要求】不能添加原始意图中没有的信息，只能对已有信息进行优化
+
+【禁止事项】
+- 不能添加虚假的日期、时间、地点等信息
+- 不能添加虚假的人名、部门名称等
+- 不能添加原文中没有提及的细节
+- 不能改变原文的核心意思
 
 请按以下JSON格式返回：
 {

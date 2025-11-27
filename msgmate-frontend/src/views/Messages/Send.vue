@@ -201,13 +201,42 @@
           </el-form-item>
 
           <el-form-item label="消息内容" prop="content" required>
-            <el-input
-              v-model="form.content"
-              type="textarea"
-              placeholder="请输入消息内容"
-              :rows="6"
-              style="width: 100%; max-width: 600px"
-            />
+            <div style="width: 100%; max-width: 600px">
+              <el-input
+                v-model="form.content"
+                type="textarea"
+                placeholder="请输入消息内容"
+                :rows="6"
+                style="width: 100%"
+              />
+              <div style="margin-top: 8px; display: flex; gap: 8px; align-items: center;">
+                <el-button
+                  type="primary"
+                  size="small"
+                  @click="handleAIPolish"
+                  :loading="aiPolishLoading"
+                  :disabled="!form.content.trim()"
+                >
+                  <el-icon><MagicStick /></el-icon>
+                  AI润色
+                </el-button>
+                <el-tooltip content="使用AI自动润色消息内容，使其更专业、更吸引人">
+                  <el-icon style="cursor: help; color: #909399;"><QuestionFilled /></el-icon>
+                </el-tooltip>
+
+                <!-- HTML预览按钮 -->
+                <el-button
+                  v-if="form.channels && form.channels.includes(1)"
+                  type="text"
+                  size="small"
+                  @mouseenter="showHtmlPreview = true"
+                  @mouseleave="showHtmlPreview = false"
+                  style="margin-left: auto;"
+                >
+                  👁️ HTML预览
+                </el-button>
+              </div>
+            </div>
           </el-form-item>
         </template>
 
@@ -302,6 +331,27 @@
       </template>
     </el-dialog>
 
+    <!-- HTML预览浮窗 -->
+    <el-popover
+      v-model:visible="showHtmlPreview"
+      placement="right"
+      :width="600"
+      trigger="manual"
+      title="HTML预览"
+    >
+      <template #reference>
+        <div style="display: none;"></div>
+      </template>
+      <div class="html-preview-container">
+        <iframe
+          :srcDoc="getHtmlPreviewSrcDoc(form.content)"
+          class="html-preview-iframe"
+          frameborder="0"
+          scrolling="auto"
+        ></iframe>
+      </div>
+    </el-popover>
+
     <!-- 发送结果对话框 -->
     <el-dialog v-model="showResult" title="发送结果" width="500px">
       <div v-if="sendResult">
@@ -323,10 +373,12 @@
 import { ref, reactive, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
+import { MagicStick, QuestionFilled } from '@element-plus/icons-vue'
 import { sendMessage, getTemplate, getTemplateList } from '@/api/message'
 import { createScheduledMessage } from '@/api/scheduled'
 import { getUserList, findUsersByTags, getTagStatistics } from '@/api/user'
 import type { SendMsgReq, Template, CreateScheduledMessageReq, User, TagStatistic } from '@/types'
+import api from '@/api'
 
 // 表单引用
 const formRef = ref<FormInstance>()
@@ -433,6 +485,8 @@ const showResult = ref(false)
 const searchingUsers = ref(false)
 const previewingUsers = ref(false)
 const showUserPreview = ref(false)
+const aiPolishLoading = ref(false)
+const showHtmlPreview = ref(false)
 const sendResult = ref<{
   success: boolean
   message: string
@@ -598,6 +652,162 @@ const loadTemplates = async () => {
     }
   } catch (error) {
     ElMessage.error('加载模板失败')
+  }
+}
+
+// AI润色处理
+const handleAIPolish = async () => {
+  if (!form.content.trim()) {
+    ElMessage.warning('请先输入消息内容')
+    return
+  }
+
+  aiPolishLoading.value = true
+
+  try {
+    // 根据选择的渠道确定要润色的渠道
+    let channel = 1 // 默认邮件
+    if (form.channels && form.channels.length === 1) {
+      channel = form.channels[0]
+    }
+
+    const url = `/api/ai/polish/stream?original_intent=${encodeURIComponent(form.content)}&channel=${channel}`
+    console.log('开始流式润色请求:', url)
+
+    let polishedContent = ''
+    let polishedSubject = ''
+
+    const eventSource = new EventSource(url)
+
+    eventSource.onopen = () => {
+      console.log('SSE连接已建立')
+    }
+
+    let messageInstance = null
+    let isCompleted = false
+    let timeoutId = null
+
+    // 设置超时，防止消息永久显示
+    const setTimeoutHandler = () => {
+      timeoutId = setTimeout(() => {
+        console.warn('AI润色超时，自动关闭')
+        if (messageInstance) {
+          messageInstance.close()
+          messageInstance = null
+        }
+        eventSource.close()
+        aiPolishLoading.value = false
+        isCompleted = true
+      }, 120000) // 120秒超时
+    }
+
+    const clearTimeoutHandler = () => {
+      if (timeoutId) {
+        clearTimeout(timeoutId)
+        timeoutId = null
+      }
+    }
+
+    eventSource.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data)
+        console.log('收到SSE消息:', data.event, data.data)
+
+        switch (data.event) {
+          case 'start':
+            console.log('开始生成内容...')
+            setTimeoutHandler()
+            // 显示生成中的提示
+            messageInstance = ElMessage({
+              message: '正在生成内容，请稍候...',
+              type: 'info',
+              duration: 0
+            })
+            break
+
+          case 'chunk':
+            // 实时累积内容
+            polishedContent = data.data.total || ''
+            // 实时更新表单，让用户看到生成过程
+            form.content = polishedContent
+            console.log('当前内容长度:', polishedContent.length)
+            break
+
+          case 'complete':
+            // 生成完成
+            console.log('生成完成:', data.data)
+            clearTimeoutHandler()
+            polishedContent = data.data.content
+            polishedSubject = data.data.subject
+
+            // 更新表单内容
+            form.content = polishedContent
+
+            // 如果有主题，也更新主题
+            if (polishedSubject && !form.subject) {
+              form.subject = polishedSubject
+            }
+
+            // 关闭生成中的提示
+            if (messageInstance) {
+              messageInstance.close()
+              messageInstance = null
+            }
+
+            isCompleted = true
+            ElMessage.success('内容润色成功！')
+            eventSource.close()
+            aiPolishLoading.value = false
+            break
+
+          case 'error':
+            console.error('生成错误:', data.data)
+            clearTimeoutHandler()
+
+            // 关闭生成中的提示
+            if (messageInstance) {
+              messageInstance.close()
+              messageInstance = null
+            }
+
+            isCompleted = true
+            ElMessage.error(data.data.message || '生成失败')
+            eventSource.close()
+            aiPolishLoading.value = false
+            break
+        }
+      } catch (error) {
+        console.error('解析SSE数据失败:', error, '原始数据:', event.data)
+      }
+    }
+
+    eventSource.onerror = (error) => {
+      console.error('SSE连接错误:', error)
+      clearTimeoutHandler()
+
+      if (!isCompleted) {
+        if (messageInstance) {
+          messageInstance.close()
+          messageInstance = null
+        }
+        ElMessage.error('连接中断，请重试')
+      }
+
+      eventSource.close()
+      aiPolishLoading.value = false
+    }
+  } catch (error) {
+    console.error('AI润色失败:', error)
+    let errorMsg = 'AI润色失败'
+    if (error instanceof Error) {
+      if (error.message.includes('timeout')) {
+        errorMsg = 'AI服务响应超时，请稍后重试'
+      } else {
+        errorMsg = error.message
+      }
+    }
+    ElMessage.error(errorMsg)
+    aiPolishLoading.value = false
   }
 }
 
@@ -796,6 +1006,89 @@ const loadTagStatistics = async () => {
   }
 }
 
+// 生成HTML预览的srcDoc
+const getHtmlPreviewSrcDoc = (htmlContent: string) => {
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <style>
+        body {
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+          line-height: 1.6;
+          color: #333;
+          margin: 0;
+          padding: 20px;
+          background-color: #f5f5f5;
+        }
+        h1, h2, h3, h4, h5, h6 {
+          color: #303133;
+          margin-top: 16px;
+          margin-bottom: 8px;
+        }
+        p {
+          margin: 8px 0;
+          line-height: 1.8;
+        }
+        strong {
+          color: #303133;
+          font-weight: 600;
+        }
+        ul, ol {
+          margin: 8px 0;
+          padding-left: 24px;
+        }
+        li {
+          margin: 4px 0;
+        }
+        a {
+          color: #409EFF;
+          text-decoration: none;
+        }
+        a:hover {
+          text-decoration: underline;
+        }
+        table {
+          border-collapse: collapse;
+          width: 100%;
+          margin: 16px 0;
+        }
+        table th, table td {
+          border: 1px solid #ddd;
+          padding: 8px;
+          text-align: left;
+        }
+        table th {
+          background-color: #f5f5f5;
+          font-weight: 600;
+        }
+        code {
+          background-color: #f5f5f5;
+          padding: 2px 6px;
+          border-radius: 3px;
+          font-family: 'Courier New', monospace;
+        }
+        pre {
+          background-color: #f5f5f5;
+          padding: 12px;
+          border-radius: 4px;
+          overflow-x: auto;
+        }
+        pre code {
+          background-color: transparent;
+          padding: 0;
+        }
+      </style>
+    </head>
+    <body>
+      ${htmlContent}
+    </body>
+    </html>
+  `
+}
+
 // 初始化
 onMounted(() => {
   loadTemplates()
@@ -888,5 +1181,18 @@ onMounted(() => {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+
+.html-preview-container {
+  width: 100%;
+  height: 500px;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.html-preview-iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
 }
 </style>
