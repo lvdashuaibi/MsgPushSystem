@@ -57,16 +57,21 @@ func NewContentPolisher(client AIClient, logger *logrus.Logger) *ContentPolisher
 func (p *ContentPolisher) PolishForEmail(ctx context.Context, originalIntent string) (*PolishedContent, error) {
 	p.logger.Infof("📧 开始为邮件渠道润色内容")
 
-	prompt := fmt.Sprintf(`请将以下原始意图转换为专业的邮件内容：
+	prompt := fmt.Sprintf(`请将以下文本内容转换为HTML格式的邮件内容：
 
-原始意图：%s
+原始内容：%s
 
-要求：
+⚠️ 重要要求：
+- **严格保持原文的所有信息和含义，不要添加、删除或修改任何实质内容**
+- 只进行格式转换，将文本内容结构化为HTML邮件格式
+- 不要改写、润色或优化原文表达
+
+格式转换要求：
 1. 生成完整的HTML格式邮件内容
 2. 包含适当的标题（使用<h2>标签）
 3. 正文分段清晰，使用<p>标签
 4. 重要信息使用<strong>标签加粗强调
-5. 语气正式、专业、详尽
+5. 保持原文的语气和风格
 6. 包含适当的问候语和落款
 7. 使用合适的HTML样式，使邮件美观易读
 
@@ -111,6 +116,69 @@ func (p *ContentPolisher) PolishForEmail(ctx context.Context, originalIntent str
 		Subject:     result.Subject,
 		Content:     result.Content,
 		Format:      "html",
+		RawContent:  originalIntent,
+		Description: result.Description,
+	}, nil
+}
+
+// PolishContent 通用内容润色 - 优化文字表达
+func (p *ContentPolisher) PolishContent(ctx context.Context, originalIntent string) (*PolishedContent, error) {
+	p.logger.Infof("✨ 开始润色内容")
+
+	prompt := fmt.Sprintf(`请优化以下文本内容，使其表达更专业、更吸引人：
+
+原始内容：%s
+
+要求：
+1. 保持原文的核心含义和信息
+2. 优化语言表达，使其更专业、更吸引人
+3. 改进句子结构，提高可读性
+4. 适当添加过渡词，使逻辑更清晰
+5. 使用更恰当的词汇和表述方式
+6. 保持原文的语气和风格
+7. 不添加任何签名或前缀
+8. 不改变原文的长度过多
+
+请按以下JSON格式返回：
+{
+  "subject": "内容主题或标题（如果有的话）",
+  "content": "优化后的内容",
+  "description": "优化说明"
+}
+
+只返回JSON，不要其他说明。`, originalIntent)
+
+	response, err := p.client.SimpleChat(ctx, prompt)
+	if err != nil {
+		p.logger.Errorf("❌ 内容润色失败: %v", err)
+		return nil, fmt.Errorf("内容润色失败: %w", err)
+	}
+
+	// 解析JSON响应
+	var result struct {
+		Subject     string `json:"subject"`
+		Content     string `json:"content"`
+		Description string `json:"description"`
+	}
+
+	if err := json.Unmarshal([]byte(response), &result); err != nil {
+		p.logger.Warnf("⚠️ JSON解析失败，使用原始响应: %v", err)
+		return &PolishedContent{
+			Channel:     ChannelSMS,
+			Subject:     "优化内容",
+			Content:     response,
+			Format:      "text",
+			RawContent:  originalIntent,
+			Description: "AI优化的内容",
+		}, nil
+	}
+
+	p.logger.Infof("✅ 内容润色成功")
+	return &PolishedContent{
+		Channel:     ChannelSMS,
+		Subject:     result.Subject,
+		Content:     result.Content,
+		Format:      "text",
 		RawContent:  originalIntent,
 		Description: result.Description,
 	}, nil
@@ -183,19 +251,34 @@ func (p *ContentPolisher) PolishForSMS(ctx context.Context, originalIntent strin
 func (p *ContentPolisher) PolishForLark(ctx context.Context, originalIntent string) (*PolishedContent, error) {
 	p.logger.Infof("🦅 开始为飞书渠道润色内容")
 
-	prompt := fmt.Sprintf(`请将以下原始意图转换为飞书交互卡片的JSON结构：
+	prompt := fmt.Sprintf(`请将以下文本内容转换为飞书交互卡片的JSON结构：
 
-原始意图：%s
+原始内容：%s
 
-要求：
-1. 生成完整的飞书卡片JSON结构
-2. 标题使用红色警告色（如果是重要通知）或蓝色（普通通知）
-3. 正文使用Markdown格式，支持加粗、列表等
-4. 包含一个"查看详情"或"了解更多"的按钮
-5. 卡片结构清晰，信息层次分明
-6. 使用飞书卡片的标准JSON格式
+⚠️ 重要要求：
+- **严格保持原文的所有信息和含义，不要添加、删除或修改任何实质内容**
+- 只进行格式转换，将文本内容结构化为飞书卡片格式
+- 不要改写、润色或优化原文表达
 
-飞书卡片JSON示例结构：
+格式转换要求：
+1. 生成完整的飞书卡片JSON结构，必须是有效的JSON格式
+2. 根据内容类型选择合适的标题颜色：
+   - "blue": 普通通知、信息提醒
+   - "red": 紧急通知、警告信息
+   - "green": 成功消息、完成通知
+   - "orange": 待办事项、提醒
+3. 正文使用Markdown格式，支持：
+   - **加粗文本**
+   - *斜体文本*
+   - 列表（使用 - 或数字）
+   - 链接 [文本](url)
+4. 如果有多个信息字段，使用fields布局展示（如订单号、时间等）
+5. 添加分割线(hr)分隔不同部分
+6. 添加note元素显示提示信息
+7. 添加交互按钮（如"查看详情"、"立即处理"等）
+8. 使用emoji让内容更生动（📦📧💡✅⚠️等）
+
+飞书卡片完整示例：
 {
   "config": {
     "wide_screen_mode": true
@@ -203,17 +286,65 @@ func (p *ContentPolisher) PolishForLark(ctx context.Context, originalIntent stri
   "header": {
     "title": {
       "tag": "plain_text",
-      "content": "标题"
+      "content": "📦 订单发货通知"
     },
-    "template": "red"
+    "template": "blue"
   },
   "elements": [
     {
       "tag": "div",
       "text": {
         "tag": "lark_md",
-        "content": "**正文内容**\n- 要点1\n- 要点2"
+        "content": "尊敬的 **客户**，您好！\n\n您的订单已成功发货，请注意查收。"
       }
+    },
+    {
+      "tag": "hr"
+    },
+    {
+      "tag": "div",
+      "fields": [
+        {
+          "is_short": true,
+          "text": {
+            "tag": "lark_md",
+            "content": "**订单编号**\nORD123456"
+          }
+        },
+        {
+          "is_short": true,
+          "text": {
+            "tag": "lark_md",
+            "content": "**下单时间**\n2025-12-03 10:30"
+          }
+        },
+        {
+          "is_short": true,
+          "text": {
+            "tag": "lark_md",
+            "content": "**快递公司**\n顺丰速运"
+          }
+        },
+        {
+          "is_short": true,
+          "text": {
+            "tag": "lark_md",
+            "content": "**运单号**\nSF1234567890"
+          }
+        }
+      ]
+    },
+    {
+      "tag": "hr"
+    },
+    {
+      "tag": "note",
+      "elements": [
+        {
+          "tag": "plain_text",
+          "content": "💡 预计2-3个工作日送达，请保持手机畅通"
+        }
+      ]
     },
     {
       "tag": "action",
@@ -222,10 +353,19 @@ func (p *ContentPolisher) PolishForLark(ctx context.Context, originalIntent stri
           "tag": "button",
           "text": {
             "tag": "plain_text",
-            "content": "查看详情"
+            "content": "查看物流"
           },
           "type": "primary",
-          "url": "https://example.com"
+          "url": "https://example.com/track"
+        },
+        {
+          "tag": "button",
+          "text": {
+            "tag": "plain_text",
+            "content": "联系客服"
+          },
+          "type": "default",
+          "url": "https://example.com/contact"
         }
       ]
     }
@@ -234,10 +374,17 @@ func (p *ContentPolisher) PolishForLark(ctx context.Context, originalIntent stri
 
 请按以下JSON格式返回：
 {
-  "subject": "卡片标题",
-  "content": "完整的飞书卡片JSON结构（字符串形式）",
+  "subject": "卡片标题（简短，带emoji）",
+  "content": "完整的飞书卡片JSON结构（必须是转义后的JSON字符串）",
   "description": "内容简要说明"
 }
+
+注意：
+1. content字段必须是JSON字符串，不是JSON对象
+2. 确保所有JSON格式正确，特别是引号和逗号
+3. 根据原始意图提取关键信息，合理组织卡片结构
+4. 如果有具体数据（如订单号、时间等），使用fields展示
+5. 按钮URL可以使用占位符，如 https://example.com/action
 
 只返回JSON，不要其他说明。`, originalIntent)
 

@@ -176,7 +176,7 @@ func (p *SendMsgHandler) parseRecipients() ([]string, error) {
 				continue
 			}
 
-			// 根据模板渠道选择合适的联系方式
+			// 根据模板渠道或直接发送渠道选择合适的联系方式
 			recipient := p.getRecipientByChannel(user)
 			if recipient != "" {
 				recipients = append(recipients, recipient)
@@ -222,15 +222,30 @@ func (p *SendMsgHandler) getRecipientByChannel(user *data.User) string {
 		channel = mt.Channel
 	} else if len(p.Req.Channels) > 0 {
 		// 直接发送模式：使用第一个渠道
+		// 注意：当前端为多个渠道分别发送请求时，每个请求中的Channels数组只包含该渠道
+		// 例如：邮件请求中 Channels=[1]，飞书请求中 Channels=[3]
 		channel = p.Req.Channels[0]
 	}
 
+	// 根据渠道获取用户的对应联系方式
 	switch channel {
 	case 1: // 邮件
+		if user.Email == "" {
+			log.Warnf("user %s has no email address", user.UserID)
+			return ""
+		}
 		return user.Email
 	case 2: // 短信
+		if user.Mobile == "" {
+			log.Warnf("user %s has no mobile number", user.UserID)
+			return ""
+		}
 		return user.Mobile
 	case 3: // 飞书
+		if user.LarkID == "" {
+			log.Warnf("user %s has no lark id", user.UserID)
+			return ""
+		}
 		return user.LarkID
 	default:
 		// 默认优先级：邮箱 > 手机号 > 飞书ID
@@ -240,7 +255,11 @@ func (p *SendMsgHandler) getRecipientByChannel(user *data.User) string {
 		if user.Mobile != "" {
 			return user.Mobile
 		}
-		return user.LarkID
+		if user.LarkID != "" {
+			return user.LarkID
+		}
+		log.Warnf("user %s has no valid contact information", user.UserID)
+		return ""
 	}
 }
 

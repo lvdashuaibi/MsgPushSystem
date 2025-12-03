@@ -117,10 +117,12 @@ docker-compose/zookeeper/
 config/config-local.toml
 config/config-prod.toml
 config/config-niuge.toml
+config/config-docker.toml
 config/*-local.toml
 config/*-prod.toml
 config/*-niuge.toml
 config/*-private.toml
+config/*-docker.toml
 
 # 环境配置
 .env.production

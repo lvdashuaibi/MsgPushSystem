@@ -3,6 +3,7 @@ package consumer
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/lvdashuaibi/MsgPushSystem/src/ctrl/msgpush"
 	"github.com/lvdashuaibi/MsgPushSystem/src/data"
@@ -105,7 +106,20 @@ func (p *LarkProc) SendMsg() error {
 		fmt.Println("Error getting access token:", err)
 		return err
 	}
-	err = msgpush.SendMessage(accessToken, p.To, p.Content)
+
+	// 检查内容是否为JSON格式的卡片（AI润色生成的）
+	// 如果内容以 { 开头并包含 "config" 或 "header"，则认为是卡片JSON
+	content := p.Content
+	if len(content) > 0 && content[0] == '{' &&
+		(strings.Contains(content, `"config"`) || strings.Contains(content, `"header"`)) {
+		// 使用卡片消息发送
+		log.Infof("🎨 检测到飞书卡片格式，使用卡片消息发送")
+		err = msgpush.SendCardMessageFromJSON(accessToken, p.To, content)
+	} else {
+		// 使用普通文本消息发送
+		err = msgpush.SendMessage(accessToken, p.To, content)
+	}
+
 	if err != nil {
 		return err
 	}

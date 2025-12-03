@@ -73,13 +73,22 @@
         </div>
       </div>
 
-      <!-- JSON格式 -->
+      <!-- JSON格式 (飞书卡片) -->
       <div v-else-if="content.format === 'json'" class="json-preview">
         <el-tabs v-model="activeTab">
-          <el-tab-pane label="格式化" name="formatted">
+          <el-tab-pane label="卡片预览" name="preview">
+            <div class="lark-card-preview">
+              <div v-if="isStreaming" class="streaming-indicator">
+                <el-icon class="is-loading"><Loading /></el-icon>
+                <span>正在生成卡片...</span>
+              </div>
+              <LarkCardPreview :cardJson="content.content" />
+            </div>
+          </el-tab-pane>
+          <el-tab-pane label="格式化JSON" name="formatted">
             <pre class="json-code">{{ formattedJson }}</pre>
           </el-tab-pane>
-          <el-tab-pane label="原始" name="raw">
+          <el-tab-pane label="原始JSON" name="raw">
             <el-input
               v-model="content.content"
               type="textarea"
@@ -98,6 +107,7 @@
 import { ref, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import { DocumentCopy, Download, Loading } from '@element-plus/icons-vue'
+import LarkCardPreview from './LarkCardPreview.vue'
 
 const props = defineProps({
   content: {
@@ -425,5 +435,13 @@ const getIframeSrcDoc = (htmlContent) => {
   51%, 100% {
     opacity: 0;
   }
+}
+
+.lark-card-preview {
+  background-color: #F5F7FA;
+  border: 1px solid #DCDFE6;
+  border-radius: 4px;
+  padding: 20px;
+  min-height: 400px;
 }
 </style>

@@ -24,6 +24,131 @@ type StreamEvent struct {
 	Data  interface{} `json:"data"`  // 事件数据
 }
 
+// PolishContentStream 通用内容润色流式处理
+// @Summary 通用内容润色
+// @Description 使用SSE流式返回AI润色内容（优化文字表达）
+// @Tags AI润色
+// @Accept json
+// @Produce text/event-stream
+// @Param original_intent query string true "原始内容"
+// @Success 200 {string} string "SSE流"
+// @Router /ai/polish/content [get]
+func (h *AIPolishHandler) PolishContentStream(c *gin.Context) {
+	// 从query参数获取数据
+	originalIntent := c.Query("original_intent")
+
+	if originalIntent == "" {
+		c.JSON(http.StatusOK, PolishResponse{
+			Code: constant.ERR_INPUT_INVALID,
+			Msg:  "原始内容不能为空",
+		})
+		return
+	}
+
+	log.Infof("✨ 收到内容润色请求，原始内容: %s", originalIntent)
+
+	// 检查润色器是否可用
+	if !h.polisher.IsAvailable() {
+		log.Error("AI润色器不可用")
+		c.JSON(http.StatusOK, PolishResponse{
+			Code: constant.ERR_INTERNAL,
+			Msg:  "AI服务暂时不可用，请稍后重试",
+		})
+		return
+	}
+
+	// 设置SSE响应头
+	c.Header("Content-Type", "text/event-stream")
+	c.Header("Cache-Control", "no-cache")
+	c.Header("Connection", "keep-alive")
+	c.Header("X-Accel-Buffering", "no")
+
+	// 发送开始事件
+	sendSSE(c.Writer, "start", map[string]interface{}{
+		"message": "开始优化内容...",
+	})
+	c.Writer.Flush()
+
+	ctx := c.Request.Context()
+
+	// 构建提示词
+	prompt := buildPolishPrompt(originalIntent)
+
+	log.Infof("📝 开始流式优化内容")
+
+	// 累积的内容
+	var accumulatedContent string
+	var subject string
+	var description string
+
+	// 创建临时AI客户端用于流式调用
+	logger := log.GetLogger()
+	aiClient := ai.NewGPTUtilsClient(logger)
+	defer aiClient.Close()
+
+	// 使用流式API
+	err := aiClient.SimpleChatStream(ctx, prompt, func(chunk string) error {
+		accumulatedContent += chunk
+
+		// 发送chunk事件
+		sendSSE(c.Writer, "chunk", map[string]interface{}{
+			"content": chunk,
+			"total":   accumulatedContent,
+		})
+		c.Writer.Flush()
+
+		// 检查客户端是否断开连接
+		select {
+		case <-ctx.Done():
+			return io.EOF
+		default:
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		log.Errorf("❌ 内容润色失败: %v", err)
+		sendSSE(c.Writer, "error", map[string]interface{}{
+			"message": "内容优化失败: " + err.Error(),
+		})
+		c.Writer.Flush()
+		return
+	}
+
+	// 尝试解析JSON响应
+	var result struct {
+		Subject     string `json:"subject"`
+		Content     string `json:"content"`
+		Description string `json:"description"`
+	}
+
+	if err := json.Unmarshal([]byte(accumulatedContent), &result); err == nil {
+		subject = result.Subject
+		description = result.Description
+		accumulatedContent = result.Content
+	} else {
+		// 如果不是JSON，使用默认值
+		subject = "优化内容"
+		description = "AI优化生成"
+	}
+
+	// 发送完成事件
+	polishedContent := &ai.PolishedContent{
+		Channel:     ai.ChannelSMS,
+		Subject:     subject,
+		Content:     accumulatedContent,
+		Format:      "text",
+		RawContent:  originalIntent,
+		Description: description,
+	}
+
+	sendSSE(c.Writer, "complete", polishedContent)
+	c.Writer.Flush()
+
+	log.Infof("✅ 内容润色完成")
+}
+
 // PolishForSingleChannelStream 单渠道流式润色
 // @Summary 单渠道流式润色
 // @Description 使用SSE流式返回AI润色内容
@@ -199,6 +324,44 @@ func sendSSE(w gin.ResponseWriter, event string, data interface{}) {
 	}
 
 	fmt.Fprintf(w, "data: %s\n\n", jsonData)
+}
+
+// buildPolishPrompt 构建通用内容润色提示词
+func buildPolishPrompt(originalIntent string) string {
+	return fmt.Sprintf(`你是一个专业的内容润色助手。你的任务是优化用户提供的文本内容，使其表达更专业、更吸引人。
+
+【核心原则】
+1. 保持原文的核心含义和信息
+2. 优化语言表达，使其更专业、更吸引人
+3. 改进句子结构，提高可读性
+4. 不添加任何签名或前缀
+5. 不改变原文的长度过多
+
+原始内容：%s
+
+【具体要求】
+1. 优化语言表达，使其更专业、更吸引人
+2. 改进句子结构，提高可读性
+3. 适当添加过渡词，使逻辑更清晰
+4. 使用更恰当的词汇和表述方式
+5. 保持原文的语气和风格
+6. 不添加任何签名或前缀
+7. 不改变原文的长度过多
+
+【禁止事项】
+- 不能改变原文的核心意思
+- 不能添加原文中没有的信息
+- 不能添加虚假的日期、时间、地点等信息
+- 不能添加虚假的人名、部门名称等
+
+请按以下JSON格式返回：
+{
+  "subject": "内容主题或标题（如果有的话）",
+  "content": "优化后的内容",
+  "description": "优化说明"
+}
+
+只返回JSON，不要其他说明。`, originalIntent)
 }
 
 // buildEmailPrompt 构建邮件提示词

@@ -40,6 +40,7 @@ func RegisterRouter(router *gin.Engine, aiHandler *handler.AIPolishHandler) {
 		router.POST("/ai/polish/all", aiHandler.PolishForAllChannels)
 		router.POST("/ai/polish/single", aiHandler.PolishForSingleChannel)
 		router.GET("/ai/polish/stream", aiHandler.PolishForSingleChannelStream)
+		router.GET("/ai/polish/content", aiHandler.PolishContentStream)
 		router.POST("/ai/polish/optimize", aiHandler.OptimizeContent)
 	}
 }

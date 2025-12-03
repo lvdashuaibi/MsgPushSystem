@@ -209,7 +209,8 @@
                 :rows="6"
                 style="width: 100%"
               />
-              <div style="margin-top: 8px; display: flex; gap: 8px; align-items: center;">
+              <div style="margin-top: 8px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                <!-- AI润色按钮 - 优化文字内容 -->
                 <el-button
                   type="primary"
                   size="small"
@@ -220,13 +221,29 @@
                   <el-icon><MagicStick /></el-icon>
                   AI润色
                 </el-button>
-                <el-tooltip content="使用AI自动润色消息内容，使其更专业、更吸引人">
+                <el-tooltip content="使用AI优化文字表达，使内容更专业、更吸引人">
+                  <el-icon style="cursor: help; color: #909399;"><QuestionFilled /></el-icon>
+                </el-tooltip>
+
+                <!-- AI格式转换按钮 -->
+                <el-button
+                  v-if="form.channels && form.channels.length > 0"
+                  type="success"
+                  size="small"
+                  @click="handleAIFormatConvert"
+                  :loading="aiFormatLoading"
+                  :disabled="!form.content.trim()"
+                >
+                  <el-icon><MagicStick /></el-icon>
+                  AI格式转换
+                </el-button>
+                <el-tooltip v-if="form.channels && form.channels.length > 0" content="将文字内容转换为对应渠道的格式（HTML/卡片等）">
                   <el-icon style="cursor: help; color: #909399;"><QuestionFilled /></el-icon>
                 </el-tooltip>
 
                 <!-- HTML预览按钮 -->
                 <el-button
-                  v-if="form.channels && form.channels.includes(1)"
+                  v-if="form.channels && form.channels.includes(1) && (formattedContent[1] || isHtmlContent(form.content))"
                   type="text"
                   size="small"
                   @mouseenter="showHtmlPreview = true"
@@ -234,6 +251,16 @@
                   style="margin-left: auto;"
                 >
                   👁️ HTML预览
+                </el-button>
+
+                <!-- 飞书卡片预览按钮 -->
+                <el-button
+                  v-if="form.channels && form.channels.includes(3) && (formattedContent[3] || isLarkCard(form.content))"
+                  type="text"
+                  size="small"
+                  @click="showLarkPreview = true"
+                >
+                  👁️ 卡片预览
                 </el-button>
               </div>
             </div>
@@ -344,13 +371,26 @@
       </template>
       <div class="html-preview-container">
         <iframe
-          :srcDoc="getHtmlPreviewSrcDoc(form.content)"
+          :srcDoc="getHtmlPreviewSrcDoc(getPreviewContent(1))"
           class="html-preview-iframe"
           frameborder="0"
           scrolling="auto"
         ></iframe>
       </div>
     </el-popover>
+
+    <!-- 飞书卡片预览对话框 -->
+    <el-dialog
+      v-model="showLarkPreview"
+      title="飞书卡片预览"
+      width="700px"
+    >
+      <LarkCardPreview :cardJson="getPreviewContent(3) || '{}'" />
+      <template #footer>
+        <el-button @click="showLarkPreview = false">关闭</el-button>
+        <el-button type="primary" @click="copyLarkCard">复制JSON</el-button>
+      </template>
+    </el-dialog>
 
     <!-- 发送结果对话框 -->
     <el-dialog v-model="showResult" title="发送结果" width="500px">
@@ -379,6 +419,7 @@ import { createScheduledMessage } from '@/api/scheduled'
 import { getUserList, findUsersByTags, getTagStatistics } from '@/api/user'
 import type { SendMsgReq, Template, CreateScheduledMessageReq, User, TagStatistic } from '@/types'
 import api from '@/api'
+import LarkCardPreview from '../AIPolish/components/LarkCardPreview.vue'
 
 // 表单引用
 const formRef = ref<FormInstance>()
@@ -486,7 +527,12 @@ const searchingUsers = ref(false)
 const previewingUsers = ref(false)
 const showUserPreview = ref(false)
 const aiPolishLoading = ref(false)
+const aiFormatLoading = ref(false)
 const showHtmlPreview = ref(false)
+const showLarkPreview = ref(false)
+
+// 格式化后的内容（用于预览和发送）
+const formattedContent = ref<Record<number, string>>({}) // key: channel, value: formatted content
 const sendResult = ref<{
   success: boolean
   message: string
@@ -655,7 +701,7 @@ const loadTemplates = async () => {
   }
 }
 
-// AI润色处理
+// AI润色处理 - 只优化文字，不转换格式
 const handleAIPolish = async () => {
   if (!form.content.trim()) {
     ElMessage.warning('请先输入消息内容')
@@ -665,14 +711,9 @@ const handleAIPolish = async () => {
   aiPolishLoading.value = true
 
   try {
-    // 根据选择的渠道确定要润色的渠道
-    let channel = 1 // 默认邮件
-    if (form.channels && form.channels.length === 1) {
-      channel = form.channels[0]
-    }
-
-    const url = `/api/ai/polish/stream?original_intent=${encodeURIComponent(form.content)}&channel=${channel}`
-    console.log('开始流式润色请求:', url)
+    // 使用通用内容润色接口
+    const url = `/api/ai/polish/content?original_intent=${encodeURIComponent(form.content)}`
+    console.log('开始文字润色请求:', url)
 
     let polishedContent = ''
     let polishedSubject = ''
@@ -875,28 +916,77 @@ const handleSend = async () => {
         sendData.templateID = form.templateID
         sendData.templateData = form.templateData
         sendData.subject = form.subject
+
+        // 根据接收者类型设置相应字段
+        if (receiverType.value === 'direct') {
+          sendData.to = form.to
+        } else if (receiverType.value === 'users') {
+          sendData.user_ids = form.user_ids
+        } else if (receiverType.value === 'tags') {
+          sendData.tags = form.tags
+        }
+
+        const response = await sendMessage(sendData)
+        sendResult.value = {
+          success: true,
+          message: '消息发送成功',
+          msgID: response.msgID
+        }
       } else {
         // 直接编写模式
-        sendData.channels = form.channels
-        sendData.subject = form.subject
-        sendData.content = form.content
-      }
+        // 如果有格式化内容，需要为每个渠道单独发送
+        if (Object.keys(formattedContent.value).length > 0) {
+          // 多渠道情况：为每个渠道单独发送对应的格式化内容
+          const sendPromises = form.channels.map(async (channel) => {
+            const channelSendData: any = {
+              channels: [channel],
+              subject: form.subject,
+              content: formattedContent.value[channel] || form.content,
+              priority: form.priority
+            }
 
-      // 根据接收者类型设置相应字段
-      if (receiverType.value === 'direct') {
-        sendData.to = form.to
-      } else if (receiverType.value === 'users') {
-        sendData.user_ids = form.user_ids
-      } else if (receiverType.value === 'tags') {
-        sendData.tags = form.tags
-      }
+            // 根据接收者类型设置相应字段
+            if (receiverType.value === 'direct') {
+              channelSendData.to = form.to
+            } else if (receiverType.value === 'users') {
+              channelSendData.user_ids = form.user_ids
+            } else if (receiverType.value === 'tags') {
+              channelSendData.tags = form.tags
+            }
 
-      const response = await sendMessage(sendData)
+            return sendMessage(channelSendData)
+          })
 
-      sendResult.value = {
-        success: true,
-        message: '消息发送成功',
-        msgID: response.msgID
+          const responses = await Promise.all(sendPromises)
+          const msgIDs = responses.map(r => r.msgID).join(', ')
+
+          sendResult.value = {
+            success: true,
+            message: `消息已发送到${form.channels.length}个渠道`,
+            msgID: msgIDs
+          }
+        } else {
+          // 没有格式化内容，使用原始内容发送
+          sendData.channels = form.channels
+          sendData.subject = form.subject
+          sendData.content = form.content
+
+          // 根据接收者类型设置相应字段
+          if (receiverType.value === 'direct') {
+            sendData.to = form.to
+          } else if (receiverType.value === 'users') {
+            sendData.user_ids = form.user_ids
+          } else if (receiverType.value === 'tags') {
+            sendData.tags = form.tags
+          }
+
+          const response = await sendMessage(sendData)
+          sendResult.value = {
+            success: true,
+            message: '消息发送成功',
+            msgID: response.msgID
+          }
+        }
       }
     } else {
       // 定时发送
@@ -1004,6 +1094,148 @@ const loadTagStatistics = async () => {
     // 设置空数组以防止页面卡住
     availableTags.value = []
   }
+}
+
+// AI格式转换处理 - 将文字转换为对应渠道的格式
+const handleAIFormatConvert = async () => {
+  if (!form.content.trim()) {
+    ElMessage.warning('请先输入消息内容')
+    return
+  }
+
+  if (!form.channels || form.channels.length === 0) {
+    ElMessage.warning('请先选择消息渠道')
+    return
+  }
+
+  aiFormatLoading.value = true
+
+  try {
+    // 为每个选中的渠道生成格式化内容
+    const promises = form.channels.map(async (channel) => {
+      const url = `/api/ai/polish/stream?original_intent=${encodeURIComponent(form.content)}&channel=${channel}`
+      console.log(`开始为渠道${channel}生成格式化内容:`, url)
+
+      return new Promise<{ channel: number; content: string; subject: string }>((resolve, reject) => {
+        let formattedText = ''
+        let formattedSubject = ''
+        const eventSource = new EventSource(url)
+        let isCompleted = false
+
+        const timeout = setTimeout(() => {
+          if (!isCompleted) {
+            eventSource.close()
+            reject(new Error('格式转换超时'))
+          }
+        }, 120000)
+
+        eventSource.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data)
+
+            switch (data.event) {
+              case 'chunk':
+                formattedText = data.data.total || ''
+                break
+
+              case 'complete':
+                formattedText = data.data.content
+                formattedSubject = data.data.subject
+                isCompleted = true
+                clearTimeout(timeout)
+                eventSource.close()
+                resolve({ channel, content: formattedText, subject: formattedSubject })
+                break
+
+              case 'error':
+                isCompleted = true
+                clearTimeout(timeout)
+                eventSource.close()
+                reject(new Error(data.data.message || '格式转换失败'))
+                break
+            }
+          } catch (error) {
+            console.error('解析SSE数据失败:', error)
+          }
+        }
+
+        eventSource.onerror = (error) => {
+          if (!isCompleted) {
+            clearTimeout(timeout)
+            eventSource.close()
+            reject(new Error('连接中断'))
+          }
+        }
+      })
+    })
+
+    // 显示加载提示
+    const loadingMsg = ElMessage({
+      message: '正在生成格式化内容，请稍候...',
+      type: 'info',
+      duration: 0
+    })
+
+    // 等待所有渠道的格式化完成
+    const results = await Promise.all(promises)
+
+    loadingMsg.close()
+
+    // 存储格式化后的内容
+    const newFormattedContent: Record<number, string> = {}
+    results.forEach(result => {
+      newFormattedContent[result.channel] = result.content
+      // 如果有主题且表单主题为空，使用第一个生成的主题
+      if (result.subject && !form.subject) {
+        form.subject = result.subject
+      }
+    })
+    formattedContent.value = newFormattedContent
+
+    ElMessage.success('格式转换成功！可以点击预览按钮查看效果')
+  } catch (error) {
+    console.error('AI格式转换失败:', error)
+    let errorMsg = 'AI格式转换失败'
+    if (error instanceof Error) {
+      errorMsg = error.message
+    }
+    ElMessage.error(errorMsg)
+  } finally {
+    aiFormatLoading.value = false
+  }
+}
+
+// 判断是否为HTML内容
+const isHtmlContent = (content: string | undefined) => {
+  if (!content || content.trim() === '') return false
+  // 检查是否包含HTML标签
+  return /<[a-z][\s\S]*>/i.test(content)
+}
+
+// 判断是否为飞书卡片JSON
+const isLarkCard = (content: string | undefined) => {
+  if (!content || content.trim() === '') return false
+  try {
+    const json = JSON.parse(content)
+    return !!(json.config || json.header || json.elements)
+  } catch {
+    return false
+  }
+}
+
+// 获取用于预览的内容（优先使用格式化内容）
+const getPreviewContent = (channel: number) => {
+  return formattedContent.value[channel] || form.content || ''
+}
+
+// 复制飞书卡片JSON
+const copyLarkCard = () => {
+  const content = formattedContent.value[3] || form.content || ''
+  navigator.clipboard.writeText(content).then(() => {
+    ElMessage.success('卡片JSON已复制到剪贴板')
+  }).catch(() => {
+    ElMessage.error('复制失败')
+  })
 }
 
 // 生成HTML预览的srcDoc
